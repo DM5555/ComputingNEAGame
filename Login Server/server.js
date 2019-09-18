@@ -98,8 +98,8 @@ function error401(res){
 }
 
 https.createServer({
-  cert: fs.readFileSync("./.secret/MyCertificate.crt"),
-  key: fs.readFileSync("./.secret/MyKey.key")
+  cert: fs.readFileSync("./.secret/cert.crt"),
+  key: fs.readFileSync("./.secret/key.key")
 },(req,res) => {
 
   var urlstate = checkPathSafe(req.url);
