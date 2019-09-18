@@ -6,6 +6,7 @@ IMPORTANT: This will not use any object-orientated programming, however other pi
 
 
 const https = require('https');
+const http = require('http');
 const fs = require('fs');
 const url = require('url');
 const path = require('path');
