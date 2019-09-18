@@ -131,3 +131,9 @@ https.createServer({
 
 
 }).listen(443);
+
+
+http.createServer((req,res)=>{ //Port 80 redirect from HTTP to HTTPS.
+        res.writeHead(301, {"Location":"https://"+req.headers["host"]+req.url}); //HTTPS Redirect
+        res.end();
+}).listen(80);
