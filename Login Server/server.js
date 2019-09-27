@@ -5,12 +5,14 @@ IMPORTANT: This will not use any object-orientated programming, however other pi
 */
 
 //IMPORTS
-const https = require('https');
-const http = require('http');
-const fs = require('fs');
-const url = require('url');
-const path = require('path');
-const querystring = require('querystring');
+const https = require('https'); //For main server.
+const http = require('http'); //For redirecting to HTTPS>
+const fs = require('fs'); //For accessing files.
+const url = require('url'); //URL parsing.
+const querystring = require('querystring'); //Processing queries for the API.
+const mysql = require('mysql'); //For accessing the database.
+const crypto = require('crypto'); //For generating salts and hashes.
+const buffer = require('buffer'); //For procesing data (e.g: converting string into hex). This is pretty much a more advanced string class and a string can be converted to a buffer and vice-versa.
 
 
 const contentTypes = { //Content types list.
@@ -24,6 +26,8 @@ const contentTypes = { //Content types list.
   "jpeg" : "image/jpeg",
   "svg" : "image/svg+xml"
 };
+
+var dbconnection = undefined; //Make the database connection variable global
 
 const contentDirectory = "/static"; //Images js and stuff.
 
@@ -51,8 +55,6 @@ function checkPathChars(uri){ //Regular expressions are a disgrace to society. T
 }
 
 function checkPathSafe(uri){ //Make sure passed path is safe, and return a useable path if so.
-
-
   if (uri === undefined || uri === null || uri == ""){ //No input or empty string
     return {
       status: "nopath"
@@ -145,12 +147,49 @@ function getPostData(req){ //Gets fields from a POST request.
   });
 }
 
-function apiCall(method, req, res){
+function randomSalt(){ //Creates a random string to be added to the password when hashed
+  const randomBytes = crypto.randomBytes(32); //Generate 32 random bytes to be used as a salt.
+  return buffer.from(randomBytes).toString("hex"); //Convert this into a 64 byte hex string.
+}
+
+function hashPassword(password, salt){ //Generates the password hash from the password and the salt.
+  const hasher = crypto.createHash("sha256"); //Create a function to hash data (I will be using the SHA-256 algorithm.). Think of this as a meat grinder when you throw in the meat and then turn the machine on to process it.
+  hasher.update(password.concat(salt)); //Put the password with the salt appended to it into the hasher. (Puts meat in the grinder.)
+  return hasher.digest("hex") //Grinds the meat in the metaphorical grinder. This will return a hex string.
+}
+
+function validateUsername(username){ //Ensures that the username entered is valid. It can be alphanumerical and have underscores. It must also be 3 characters in length or more but no more than 16.
+  if (username.length >= 3 && username.length <= 16){ //Length check.
+    if (/^[a-zA-Z0-9_]*$/g.test(username)){ //I have only used regex here because it was absolutely necessary. I do not want to do ascii code matching again. I could also make this shorter by plugging the match straight into the return statement but then I would not be able to comment it as easily.
+      return true; //Their username is somehow valid.
+    } else {
+      return false; //Looks like someone had illegal characters in their username!
+    }
+  } else { //Username is too short!
+    return false;
+  }
+}
+
+function validatePassword(password){ //This is a bit like the username validator except it will ensure that the password is minimum 8 chars (but max 32), it is up to the user as to whether they want to use chars or not. "password" is strictly not allowed.
+  if (password.toLowerCase() === "password" || password.length < 8 || password.length > 32){ //Don't even try it.
+    return false; //This password is bad for sure.
+  } else{
+    if(/^[ -~£€]*$/g.test(password)){ //Time for more regex! Accepts pretty much everything in ASCII between char 32 (space) and 126(~). Also accepts the pound (£) and euro (€).
+      return true; //This is valid.
+    } else {
+      return false; //Not valid.
+    }
+  }
+}
+
+function apiCall(method, req, res, dbconn){ //When an api call is made to the /api/ path.
 
   if (req.method == "POST"){ //Post methods
     getPostData(req).then((params) => {
       if (method == "create-account"){
         //TODO make a create account feature
+        console.log(params);
+
       } else {
         apiErrorDoesntExist();
       }
@@ -159,16 +198,6 @@ function apiCall(method, req, res){
     });
   } else {
     apiErrorDoesntExist();
-  }
-
-  if (method == "create-account" && req.method == "POST"){ // /api/createAccount -- Create an account on my website
-
-
-
-    res.writeHead(200);
-    res.end();
-  } else {
-    apiErrorDoesntExist(res);
   }
 }
 
@@ -181,7 +210,7 @@ function apiErrorDoesntExist(res){ //Error 404 in JSON format.
   }));
 }
 
-function apiErrorInternal(res){
+function apiErrorInternal(res){ //Internal Server error in JSON format. This uses error 500.
   res.writeHead(500);
   res.end(JSON.stringify({
     error: true,
@@ -190,7 +219,7 @@ function apiErrorInternal(res){
   }));
 }
 
-https.createServer({
+const server = https.createServer({
   cert: fs.readFileSync("./.secret/cert.crt"),
   key: fs.readFileSync("./.secret/key.key")
 },(req,res) => {
@@ -220,8 +249,6 @@ https.createServer({
         }
       });
 
-
-
       readStream.on('data', (dat) => { //File is found
         if (!headersSent){
           res.writeHead(200, generateHeaders(getFileType("customPath"))); //Write the headers and the content type of the file to be sent.
@@ -237,7 +264,7 @@ https.createServer({
 
     } else if(path.startsWith("/api/")){ //Api (Ccalls must never end with a /)
       var customPath = path.substr(5); //Remove the "/api/" from the path.
-      apiCall(customPath, req, res);
+      apiCall(customPath, req, res, dbconnection);
     } else { //Page not found
       error404(res);
     }
@@ -250,13 +277,29 @@ https.createServer({
   } else { //Default case. This could should never be called but is there to prevent the server from hanging or crashing.
     error404(res);
   }
+});
 
 
-
-}).listen(443); //Run the server on the default https port 443.
-
-
-http.createServer((req,res)=>{ //Port 80 redirect from HTTP to HTTPS.
+const httpserver = http.createServer((req,res)=>{ //Port 80 redirect from HTTP to HTTPS.
         res.writeHead(301, {"Location":"https://"+req.headers["host"]+req.url}); //HTTPS Redirect
-        res.end();
-}).listen(80);
+        res.end(); //Close connection.
+});
+
+dbconnection = mysql.createConnection({ //Create a sql database connection;
+  host: "localhost", //Login to localhost server.
+  user: "login_server", //Username is login_server.
+  password: fs.readFileSync("./.secret/db_password"), //Password is read from the db_password file in the secret folder.
+  database: "domsgame" //Select 'domsgame' database.
+});
+
+dbconnection.connect((err) => { //Attempt the connection to the server
+  if(err){ //Error thrown if connection is failed.
+    throw err;
+  }
+
+  //Reaches here if the connection is scucessful.
+  console.log("Database connection successful!");
+  //Start the webservers now that the database can be accessed.
+  httpserver.listen(80); //Listens on port 80 to redirect incoming insecure HTTP traffic.
+  server.listen(443); //Run the server on the default https port 443.
+});
