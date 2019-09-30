@@ -84,24 +84,56 @@ function checkPathSafe(uri){ //Make sure passed path is safe, and return a useab
 
 }
 
-function generateHeaders(type){ //Generate headers based on file type
+function generateHeaders(type, cacheTime){ //Generate headers based on file type and how long to cache the file.
   var headers = {
-    "X-Frame-Options":"DENY",
+    "X-Frame-Options":"DENY"
   }
 
   var typeName = contentTypes[type];
 
+
+
+  headers["Cache-Control"] = cacheTime!==-1?"public, max-age="+cacheTime:"no-store"; //Wheteher or not to cache the file.
   headers["Content-Type"] = typeName===undefined?"text/plain":typeName; //Default to plaintext
 
+  if (cacheTime !== -1){ //Set expiry time for cache.
+    headers["Expires"] = new Date(Date.now()+cacheTime*1000).toGMTString(); //Adds time in milliseconds to current date.
+  }
+
   return headers;
-};
+}
+
+//************
+//DOESNT WORK PROPERLY
+//************
+function getFilesLastModified(dir){ //Recursively finds files in a directory and returns their last modified time.
+  return new Promise((resolve,reject) => { //Callback function
+    var items = {}; //Create new object.
+    fs.readdir(dir, (err, contents) => { //Index current directory.
+      if (err){reject(err);} else{ //Catch errors.
+        contents.forEach((item) => { //Iterate the contents of the directory.
+          fs.stat(dir+"/"+item,(err, itemStats) => { //Get stats of the file (it's properties).
+            if (err) {reject(err);} else { //More error catching.
+              if (itemStats.isDirectory()){ //If the item is a subdirectory.
+                getFilesLastModified(dir+"/"+item+"/"); //Recursively index files in that folder (the folders shouldnt get too deep to the point where the program crashes due to StackOverflowError).
+              }  else { //Item is file.
+                items[dir+"/"+item] = itemStats.mtime; //The last modification time in seconds.
+              }
+            }
+          });
+        });
+      }
+    });
+    resolve(items);
+  });
+}
 
 function getFileType(filename){ //Return the type to be used for the generateHeaders function.
   const extensions = Object.keys(contentTypes); //Get list of extensions
 
-  for (var i in extensions){ //Index extensions
-    if (filename.endsWith(extensions[i])){
-      return extensions[i];
+  for (var ex of extensions){ //Index extensions
+    if (filename.endsWith(".".concat(ex))){ //Extension matches.
+      return ex;
     }
   }
 
@@ -109,17 +141,17 @@ function getFileType(filename){ //Return the type to be used for the generateHea
 }
 
 function error404(res){ //Generaic error 404 for when a page is not found.
-  res.writeHead(404, generateHeaders("html"));
+  res.writeHead(404, generateHeaders("html",-1));
   res.end("404: Page not found!");
 }
 
 function error401(res){ //Used when a path cannot be trusted and no attempt will be made to find it.
-  res.writeHead(401, generateHeaders("html"));
+  res.writeHead(401, generateHeaders("html",-1));
   res.end("401: The path was invalid or you do not have access!");
 }
 
 function error500(res){ //Used when something went wrong.
-  res.writeHead(500, generateHeaders("html"));
+  res.writeHead(500, generateHeaders("html",-1));
   res.end("500: Internal server error.");
 }
 
@@ -159,26 +191,34 @@ function hashPassword(password, salt){ //Generates the password hash from the pa
 }
 
 function validateUsername(username){ //Ensures that the username entered is valid. It can be alphanumerical and have underscores. It must also be 3 characters in length or more but no more than 16.
-  if (username.length >= 3 && username.length <= 16){ //Length check.
-    if (/^[a-zA-Z0-9_]*$/g.test(username)){ //I have only used regex here because it was absolutely necessary. I do not want to do ascii code matching again. I could also make this shorter by plugging the match straight into the return statement but then I would not be able to comment it as easily.
-      return true; //Their username is somehow valid.
-    } else {
-      return false; //Looks like someone had illegal characters in their username!
+  if (username !== undefined && username !== null || typeof password == "string"){ //Null check.
+    if (username.length >= 3 && username.length <= 16){ //Length check.
+      if (/^[a-zA-Z0-9_]*$/g.test(username)){ //I have only used regex here because it was absolutely necessary. I do not want to do ascii code matching again. I could also make this shorter by plugging the match straight into the return statement but then I would not be able to comment it as easily.
+        return true; //Their username is somehow valid.
+      } else {
+        return false; //Looks like someone had illegal characters in their username!
+      }
+    } else { //Username is too short!
+      return false;
     }
-  } else { //Username is too short!
+  } else { //Not a string.
     return false;
   }
 }
 
 function validatePassword(password){ //This is a bit like the username validator except it will ensure that the password is minimum 8 chars (but max 32), it is up to the user as to whether they want to use chars or not. "password" is strictly not allowed.
-  if (password.toLowerCase() === "password" || password.length < 8 || password.length > 32){ //Don't even try it.
-    return false; //This password is bad for sure.
-  } else{
-    if(/^[ -~£€]*$/g.test(password)){ //Time for more regex! Accepts pretty much everything in ASCII between char 32 (space) and 126(~). Also accepts the pound (£) and euro (€).
-      return true; //This is valid.
-    } else {
-      return false; //Not valid.
+  if (password !== undefined && password !== null && typeof password == "string"){ //Null check.
+    if (password.toLowerCase() === "password" || password.length < 8 || password.length > 32){ //Don't even try it.
+      return false; //This password is bad for sure.
+    } else{
+      if(/^[ -~£€]*$/g.test(password)){ //Time for more regex! Accepts pretty much everything in ASCII between char 32 (space) and 126(~). Also accepts the pound (£) and euro (€).
+        return true; //This is valid.
+      } else {
+        return false; //Not valid.
+      }
     }
+  } else { //Not a string.
+    return false;
   }
 }
 
@@ -188,16 +228,17 @@ function apiCall(method, req, res, dbconn){ //When an api call is made to the /a
     getPostData(req).then((params) => {
       if (method == "create-account"){
         //TODO make a create account feature
-        console.log(params);
+
+
 
       } else {
-        apiErrorDoesntExist();
+        apiErrorDoesntExist(res); //Methods is nonexistent.
       }
     }).catch((e) => {
-      apiErrorInternal(res);
+      apiErrorInternal(res); //Something weird happened.
     });
   } else {
-    apiErrorDoesntExist();
+    apiErrorDoesntExist(res); //Method nonexistent.
   }
 }
 
@@ -219,6 +260,35 @@ function apiErrorInternal(res){ //Internal Server error in JSON format. This use
   }));
 }
 
+function apiErrorInvalidUsername(res){ //Invalid username! Error Code: 600
+  res.writeHead(400);
+  res.end(JSON.stringify({
+    error: true,
+    errorCode: 600,
+    errorMsg: "Username does not meet the requirements."
+  }));
+}
+
+function apiErrorInvalidPassword(res){ //Invalid password! Error Code: 601
+  res.writeHead(400);
+  res.end(JSON.stringify({
+    error: true,
+    errorCode: 601,
+    errorMsg: "Password does not meet the requirements."
+  }));
+}
+
+function apiErrorInvalidPassword(res){ //Invalid login credidentials! Error Code: 602
+  res.writeHead(400);
+  res.end(JSON.stringify({
+    error: true,
+    errorCode: 602,
+    errorMsg: "The username or password you have entered is incorrect."
+  }));
+}
+
+
+
 const server = https.createServer({
   cert: fs.readFileSync("./.secret/cert.crt"),
   key: fs.readFileSync("./.secret/key.key")
@@ -230,10 +300,10 @@ const server = https.createServer({
     var path = urlstate.uri.toLowerCase(); //Path which will be always lowercase;
 
     if (path === "/favicon.ico"){ //Website icon.
-      res.writeHead(200, generateHeaders("ico"));
+      res.writeHead(200, generateHeaders("ico",3600));
       res.end(iconData);
     } else if (path === "/"){ //Index page.
-      res.writeHead(200);
+      res.writeHead(200 , generateHeaders("html", -1));
       res.end(indexPage);
     } else if (path.startsWith("/static/")){ //Static content directory: Just "/static" without the "/"" after is not accepted.
       var customPath = path.substr(8); //The length of "/static/" is 8 characters long.
@@ -251,7 +321,7 @@ const server = https.createServer({
 
       readStream.on('data', (dat) => { //File is found
         if (!headersSent){
-          res.writeHead(200, generateHeaders(getFileType("customPath"))); //Write the headers and the content type of the file to be sent.
+          res.writeHead(200, generateHeaders(getFileType(customPath),86400)); //Write the headers and the content type of the file to be sent.
           headersSent = true;
         }
 
