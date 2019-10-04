@@ -13,7 +13,7 @@ const querystring = require('querystring'); //Processing queries for the API.
 const mysql = require('mysql'); //For accessing the database.
 const crypto = require('crypto'); //For generating salts and hashes.
 const buffer = require('buffer'); //For procesing data (e.g: converting string into hex). This is pretty much a more advanced string class and a string can be converted to a buffer and vice-versa.
-
+const zlib = require('zlib'); //For compression.
 
 const contentTypes = { //Content types list.
   "html" : "text/html",
@@ -29,11 +29,15 @@ const contentTypes = { //Content types list.
 
 var dbconnection = undefined; //Make the database connection variable global
 
-const contentDirectory = "/static"; //Images js and stuff.
 
 //Preload icon and index page.
 const iconData = fs.readFileSync("./favicon.ico");
+const iconDataCompressed = zlib.gzipSync(iconData) //Compressed version of icon.
 const indexPage = fs.readFileSync("./index.html");
+const indexPageCompressed = zlib.gzipSync(indexPage); //Compressed index page.
+
+//Get the lst modified time of the static directory.
+const staticModifyDates = getFilesLastModified(__dirname + "/static");
 
 function checkPathChars(uri){ //Regular expressions are a disgrace to society. This function is designed to stop any path traversal attacks on my server.
   var prevchrcode = undefined;
@@ -84,17 +88,21 @@ function checkPathSafe(uri){ //Make sure passed path is safe, and return a useab
 
 }
 
-function generateHeaders(type, cacheTime){ //Generate headers based on file type and how long to cache the file.
+function generateHeaders(type, cacheTime, compressed){ //Generate headers based on file type and how long to cache the file.
   var headers = {
     "X-Frame-Options":"DENY"
   }
 
-  var typeName = contentTypes[type];
+  if (type !== ""){ //No type
+    var typeName = contentTypes[type];
+    headers["Content-Type"] = typeName===undefined?"text/plain":typeName; //Default to plaintext
+  }
 
-
+  if(compressed){ //If there is compression enabled.
+    headers["Content-Encoding"] = "gzip"; //Gzip only.
+  }
 
   headers["Cache-Control"] = cacheTime!==-1?"public, max-age="+cacheTime:"no-store"; //Wheteher or not to cache the file.
-  headers["Content-Type"] = typeName===undefined?"text/plain":typeName; //Default to plaintext
 
   if (cacheTime !== -1){ //Set expiry time for cache.
     headers["Expires"] = new Date(Date.now()+cacheTime*1000).toGMTString(); //Adds time in milliseconds to current date.
@@ -104,28 +112,61 @@ function generateHeaders(type, cacheTime){ //Generate headers based on file type
 }
 
 //************
-//DOESNT WORK PROPERLY
+//RETURNS A DATE OBJECT PER FILE, NOT A TIME IN SECONDS;
 //************
 function getFilesLastModified(dir){ //Recursively finds files in a directory and returns their last modified time.
-  return new Promise((resolve,reject) => { //Callback function
-    var items = {}; //Create new object.
-    fs.readdir(dir, (err, contents) => { //Index current directory.
-      if (err){reject(err);} else{ //Catch errors.
-        contents.forEach((item) => { //Iterate the contents of the directory.
-          fs.stat(dir+"/"+item,(err, itemStats) => { //Get stats of the file (it's properties).
-            if (err) {reject(err);} else { //More error catching.
-              if (itemStats.isDirectory()){ //If the item is a subdirectory.
-                getFilesLastModified(dir+"/"+item+"/"); //Recursively index files in that folder (the folders shouldnt get too deep to the point where the program crashes due to StackOverflowError).
-              }  else { //Item is file.
-                items[dir+"/"+item] = itemStats.mtime; //The last modification time in seconds.
-              }
-            }
-          });
-        });
+  var folderQueue = [].concat(dir); //Create a queue for folders to index with the dir parameter as the first folder.
+  var files = {};
+  while (folderQueue.length > 0){ //While there are folders to index. Process the folders inside this loop.
+    let folderContents = fs.readdirSync(folderQueue[0]); //Index first folder.
+    for (let i of folderContents){ //Index the folder contents.
+      let filePath = folderQueue[0] + "/" + i; //Relative path of the file.
+      let item = fs.statSync(filePath);
+      if (item.isDirectory()){ //If the item is a folder.
+        folderQueue.push(filePath); //Add the folder to the path.
+      } else { //The item is a file.
+        files[filePath] = item.mtime; //Add last modification time (as a date object).
       }
-    });
-    resolve(items);
-  });
+    }
+    folderQueue.shift(0); //Remove first item from queue.
+  }
+  return files;
+}
+
+
+function shouldFileBeSent(headers, filepath){ //Cheks if he file has been last modified since the time specified. Returns true if the file needs resending.
+  if (headers["if-modified-since"] !== undefined){ //Check if there is an if-modifed-since header.
+    var lastModifed = headers["if-modified-since"]; //Set the value of the if-modified-since header to this.
+    try { //Try catch for date.
+      var lastModifedDate = new Date(lastModifed); //The date that it was last modified in the date object.
+
+    } catch (e){ //If the date was note valid.
+      return true;
+    }
+
+    //The date is valid.
+    if (staticModifyDates[filepath] !== undefined){
+      var fileDate = staticModifyDates[filepath]; //Get the modification date of the file.
+
+      if (fileDate.getTime() >= lastModifedDate.getTime()){ //Compare dates.
+        return true; //File needs resending.
+      } else {
+        return false; //The file does not need resending.
+      }
+    } else {
+      return true;
+    }
+  } else {
+    return true;
+  }
+}
+
+function supportsCompression(headers){ //Check if the browser supports gzip compression.
+  if (headers["accept-encoding"] !== undefined){
+    return headers["accept-encoding"].includes("gzip"); //Chcek if the accept encoding string contains gzip.
+  } else {
+    return false;
+  }
 }
 
 function getFileType(filename){ //Return the type to be used for the generateHeaders function.
@@ -141,17 +182,17 @@ function getFileType(filename){ //Return the type to be used for the generateHea
 }
 
 function error404(res){ //Generaic error 404 for when a page is not found.
-  res.writeHead(404, generateHeaders("html",-1));
+  res.writeHead(404, generateHeaders("html",-1,false));
   res.end("404: Page not found!");
 }
 
 function error401(res){ //Used when a path cannot be trusted and no attempt will be made to find it.
-  res.writeHead(401, generateHeaders("html",-1));
+  res.writeHead(401, generateHeaders("html",-1,false));
   res.end("401: The path was invalid or you do not have access!");
 }
 
 function error500(res){ //Used when something went wrong.
-  res.writeHead(500, generateHeaders("html",-1));
+  res.writeHead(500, generateHeaders("html",-1,false));
   res.end("500: Internal server error.");
 }
 
@@ -290,47 +331,63 @@ function apiErrorInvalidPassword(res){ //Invalid login credidentials! Error Code
 
 
 const server = https.createServer({
-  cert: fs.readFileSync("./.secret/cert.crt"),
-  key: fs.readFileSync("./.secret/key.key")
+  cert: fs.readFileSync("./.secret/cert.crt"), //Open the server certificate.
+  key: fs.readFileSync("./.secret/key.key") //Open the server key.
 },(req,res) => {
-
+  var gzipEnabled = supportsCompression(req.headers); //If gzip is allowed.
   var urlstate = checkPathSafe(req.url);
 
   if (urlstate.status == "safe"){ //Check path state
     var path = urlstate.uri.toLowerCase(); //Path which will be always lowercase;
 
     if (path === "/favicon.ico"){ //Website icon.
-      res.writeHead(200, generateHeaders("ico",3600));
-      res.end(iconData);
+      res.writeHead(200, generateHeaders("ico",3600, gzipEnabled));
+      if (gzipEnabled){
+        res.end(iconDataCompressed); //Compressed icon.
+      } else {
+        res.end(iconData); //Regular icon.
+      }
+
     } else if (path === "/"){ //Index page.
-      res.writeHead(200 , generateHeaders("html", -1));
-      res.end(indexPage);
+      res.writeHead(200 , generateHeaders("html", -1, gzipEnabled));
+      if (gzipEnabled){ //Whether to send the compressed version or not.
+        res.end(indexPageCompressed);
+      } else {
+        res.end(indexPage);
+      }
     } else if (path.startsWith("/static/")){ //Static content directory: Just "/static" without the "/"" after is not accepted.
+      //**************************************************
+      //TODO ENABLE CONTENT ENCODING FOR STATIC DIRECTORY.
+      //**************************************************
       var customPath = path.substr(8); //The length of "/static/" is 8 characters long.
+      if (shouldFileBeSent(req.headers, __dirname + "/static/" + customPath)){ //Check if the file should actually be sent as the user may have cached it.
+        var readStream = fs.createReadStream(__dirname + "/static/" + customPath); //Open the file.
+        var headersSent = false; //Whether the headers have been sent or not.
 
-      var readStream = fs.createReadStream(__dirname + "/static/" + customPath);
-      var headersSent = false; //Whether the headers have been sent or not.
+        readStream.on('error', (err)=>{ //File not found.
+          if (!headersSent){ //Only do an error 404 if there is no data sent yet.
+            error404(res);
+          } else {
+            res.end(); //Terminate the connection if there is a read error midway through the operation.
+          }
+        });
 
-      readStream.on('error', (err)=>{ //File not found.
-        if (!headersSent){ //Only do an error 404 if there is no data sent yet.
-          error404(res);
-        } else {
-          res.end(); //Terminate the connection if there is a read error midway through the operation.
-        }
-      });
+        readStream.on('data', (dat) => { //File is found
+          if (!headersSent){
+            res.writeHead(200, generateHeaders(getFileType(customPath),86400)); //Write the headers and the content type of the file to be sent.
+            headersSent = true;
+          }
 
-      readStream.on('data', (dat) => { //File is found
-        if (!headersSent){
-          res.writeHead(200, generateHeaders(getFileType(customPath),86400)); //Write the headers and the content type of the file to be sent.
-          headersSent = true;
-        }
+          res.write(dat);
+        });
 
-        res.write(dat);
-      });
-
-      readStream.on('close',() => { //Ends the response when all of the file has been read or the connection has eneded.
+        readStream.on('close',() => { //Ends the response when all of the file has been read or the connection has eneded.
+          res.end();
+        });
+      } else {
+        res.writeHead(304,generateHeaders("",-1)); //Respond with 304 file is already there.
         res.end();
-      });
+      }
 
     } else if(path.startsWith("/api/")){ //Api (Ccalls must never end with a /)
       var customPath = path.substr(5); //Remove the "/api/" from the path.
@@ -366,7 +423,6 @@ dbconnection.connect((err) => { //Attempt the connection to the server
   if(err){ //Error thrown if connection is failed.
     throw err;
   }
-
   //Reaches here if the connection is scucessful.
   console.log("Database connection successful!");
   //Start the webservers now that the database can be accessed.
