@@ -1,4 +1,6 @@
 "use strict"; //Prevent odd JS behavior.
+/* jshint esversion: 6 */
+/* jshint node: true */
 
 /*
 IMPORTANT: This will not use any object-orientated programming, however other pieces of code will.
@@ -14,6 +16,8 @@ const mysql = require('mysql'); //For accessing the database.
 const crypto = require('crypto'); //For generating salts and hashes.
 const buffer = require('buffer'); //For procesing data (e.g: converting string into hex). This is pretty much a more advanced string class and a string can be converted to a buffer and vice-versa.
 const zlib = require('zlib'); //For compression.
+const stream = require('stream'); //For data streaming.
+const {validateUsername, validatePassword} = require('./static/sharedscripts.js');
 
 const contentTypes = { //Content types list.
   "html" : "text/html",
@@ -24,15 +28,16 @@ const contentTypes = { //Content types list.
   "css" : "text/css",
   "gif" : "image/gif",
   "jpeg" : "image/jpeg",
+  "jpg" : "image/jpeg",
   "svg" : "image/svg+xml"
 };
 
-var dbconnection = undefined; //Make the database connection variable global
+var dbconnection; //Make the database connection variable global
 
 
 //Preload icon and index page.
 const iconData = fs.readFileSync("./favicon.ico");
-const iconDataCompressed = zlib.gzipSync(iconData) //Compressed version of icon.
+const iconDataCompressed = zlib.gzipSync(iconData); //Compressed version of icon.
 const indexPage = fs.readFileSync("./index.html");
 const indexPageCompressed = zlib.gzipSync(indexPage); //Compressed index page.
 
@@ -40,7 +45,7 @@ const indexPageCompressed = zlib.gzipSync(indexPage); //Compressed index page.
 const staticModifyDates = getFilesLastModified(__dirname + "/static");
 
 function checkPathChars(uri){ //Regular expressions are a disgrace to society. This function is designed to stop any path traversal attacks on my server.
-  var prevchrcode = undefined;
+  var prevchrcode;
   for(var i in uri){
     var chrcode = uri.charCodeAt(i);
 
@@ -91,7 +96,7 @@ function checkPathSafe(uri){ //Make sure passed path is safe, and return a useab
 function generateHeaders(type, cacheTime, compressed){ //Generate headers based on file type and how long to cache the file.
   var headers = {
     "X-Frame-Options":"DENY"
-  }
+  };
 
   if (type !== ""){ //No type
     var typeName = contentTypes[type];
@@ -105,7 +110,7 @@ function generateHeaders(type, cacheTime, compressed){ //Generate headers based 
   headers["Cache-Control"] = cacheTime!==-1?"public, max-age="+cacheTime:"no-store"; //Wheteher or not to cache the file.
 
   if (cacheTime !== -1){ //Set expiry time for cache.
-    headers["Expires"] = new Date(Date.now()+cacheTime*1000).toGMTString(); //Adds time in milliseconds to current date.
+    headers.Expires = new Date(Date.now()+cacheTime*1000).toGMTString(); //Adds time in milliseconds to current date.
   }
 
   return headers;
@@ -136,9 +141,10 @@ function getFilesLastModified(dir){ //Recursively finds files in a directory and
 
 function shouldFileBeSent(headers, filepath){ //Cheks if he file has been last modified since the time specified. Returns true if the file needs resending.
   if (headers["if-modified-since"] !== undefined){ //Check if there is an if-modifed-since header.
+    var lastModifiedDate;
     var lastModifed = headers["if-modified-since"]; //Set the value of the if-modified-since header to this.
     try { //Try catch for date.
-      var lastModifedDate = new Date(lastModifed); //The date that it was last modified in the date object.
+      lastModifiedDate = new Date(lastModifed); //The date that it was last modified in the date object.
 
     } catch (e){ //If the date was note valid.
       return true;
@@ -148,7 +154,7 @@ function shouldFileBeSent(headers, filepath){ //Cheks if he file has been last m
     if (staticModifyDates[filepath] !== undefined){
       var fileDate = staticModifyDates[filepath]; //Get the modification date of the file.
 
-      if (fileDate.getTime() >= lastModifedDate.getTime()){ //Compare dates.
+      if (fileDate.getTime() >= lastModifiedDate.getTime()){ //Compare dates.
         return true; //File needs resending.
       } else {
         return false; //The file does not need resending.
@@ -228,50 +234,16 @@ function randomSalt(){ //Creates a random string to be added to the password whe
 function hashPassword(password, salt){ //Generates the password hash from the password and the salt.
   const hasher = crypto.createHash("sha256"); //Create a function to hash data (I will be using the SHA-256 algorithm.). Think of this as a meat grinder when you throw in the meat and then turn the machine on to process it.
   hasher.update(password.concat(salt)); //Put the password with the salt appended to it into the hasher. (Puts meat in the grinder.)
-  return hasher.digest("hex") //Grinds the meat in the metaphorical grinder. This will return a hex string.
-}
-
-function validateUsername(username){ //Ensures that the username entered is valid. It can be alphanumerical and have underscores. It must also be 3 characters in length or more but no more than 16.
-  if (username !== undefined && username !== null || typeof password == "string"){ //Null check.
-    if (username.length >= 3 && username.length <= 16){ //Length check.
-      if (/^[a-zA-Z0-9_]*$/g.test(username)){ //I have only used regex here because it was absolutely necessary. I do not want to do ascii code matching again. I could also make this shorter by plugging the match straight into the return statement but then I would not be able to comment it as easily.
-        return true; //Their username is somehow valid.
-      } else {
-        return false; //Looks like someone had illegal characters in their username!
-      }
-    } else { //Username is too short!
-      return false;
-    }
-  } else { //Not a string.
-    return false;
-  }
-}
-
-function validatePassword(password){ //This is a bit like the username validator except it will ensure that the password is minimum 8 chars (but max 32), it is up to the user as to whether they want to use chars or not. "password" is strictly not allowed.
-  if (password !== undefined && password !== null && typeof password == "string"){ //Null check.
-    if (password.toLowerCase() === "password" || password.length < 8 || password.length > 32){ //Don't even try it.
-      return false; //This password is bad for sure.
-    } else{
-      if(/^[ -~£€]*$/g.test(password)){ //Time for more regex! Accepts pretty much everything in ASCII between char 32 (space) and 126(~). Also accepts the pound (£) and euro (€).
-        return true; //This is valid.
-      } else {
-        return false; //Not valid.
-      }
-    }
-  } else { //Not a string.
-    return false;
-  }
+  return hasher.digest("hex"); //Grinds the meat in the metaphorical grinder. This will return a hex string.
 }
 
 function apiCall(method, req, res, dbconn){ //When an api call is made to the /api/ path.
-
   if (req.method == "POST"){ //Post methods
     getPostData(req).then((params) => {
-      if (method == "create-account"){
-        //TODO make a create account feature
-
-
-
+      if (method == "create-account"){ //Account creation
+        apiErrorInternal(res); //NOTE REMOVE THESE
+      } else if (method == "login"){ //Logging in.
+        apiErrorInternal(res); //Remove this too.
       } else {
         apiErrorDoesntExist(res); //Methods is nonexistent.
       }
@@ -356,41 +328,38 @@ const server = https.createServer({
         res.end(indexPage);
       }
     } else if (path.startsWith("/static/")){ //Static content directory: Just "/static" without the "/"" after is not accepted.
-      //**************************************************
-      //TODO ENABLE CONTENT ENCODING FOR STATIC DIRECTORY.
-      //**************************************************
-      var customPath = path.substr(8); //The length of "/static/" is 8 characters long.
+      let customPath = path.substr(8); //The length of "/static/" is 8 characters long.
       if (shouldFileBeSent(req.headers, __dirname + "/static/" + customPath)){ //Check if the file should actually be sent as the user may have cached it.
-        var readStream = fs.createReadStream(__dirname + "/static/" + customPath); //Open the file.
-        var headersSent = false; //Whether the headers have been sent or not.
+        if (fs.existsSync(__dirname + "/static/" + customPath)){ //Check if the file exists.
+          res.writeHead(200,generateHeaders(getFileType(customPath),86400,gzipEnabled)); //Send the headers with an exipiry time of 1 day.
+          var readStream = fs.createReadStream(__dirname + "/static/" + customPath); //Open the file.
+          var outputStream; //Define the output stream.
+          if (gzipEnabled){ //For compression
+            outputStream = zlib.createGzip(); //Create a gzip compressor.
+            outputStream.pipe(res); //Pipe the compressed data into the response.
 
-        readStream.on('error', (err)=>{ //File not found.
-          if (!headersSent){ //Only do an error 404 if there is no data sent yet.
-            error404(res);
+            outputStream.on('error',() => { //Error handling.
+              error500(res);
+            });
           } else {
-            res.end(); //Terminate the connection if there is a read error midway through the operation.
-          }
-        });
-
-        readStream.on('data', (dat) => { //File is found
-          if (!headersSent){
-            res.writeHead(200, generateHeaders(getFileType(customPath),86400)); //Write the headers and the content type of the file to be sent.
-            headersSent = true;
+            outputStream = res; //Default the output stream to the response;
           }
 
-          res.write(dat);
-        });
-
-        readStream.on('close',() => { //Ends the response when all of the file has been read or the connection has eneded.
-          res.end();
-        });
+          readStream.pipe(outputStream); //Pipe the read stream into the output stream.
+          
+          readStream.on('error', (err)=>{ //File not found.
+            error500(res); //Internal server error.
+          });
+        } else { //File not found.
+          error404(res);
+        }
       } else {
-        res.writeHead(304,generateHeaders("",-1)); //Respond with 304 file is already there.
+        res.writeHead(304,generateHeaders("",-1,false)); //Respond with 304 file is already there.
         res.end();
       }
 
     } else if(path.startsWith("/api/")){ //Api (Ccalls must never end with a /)
-      var customPath = path.substr(5); //Remove the "/api/" from the path.
+      let customPath = path.substr(5); //Remove the "/api/" from the path.
       apiCall(customPath, req, res, dbconnection);
     } else { //Page not found
       error404(res);
@@ -408,7 +377,7 @@ const server = https.createServer({
 
 
 const httpserver = http.createServer((req,res)=>{ //Port 80 redirect from HTTP to HTTPS.
-        res.writeHead(301, {"Location":"https://"+req.headers["host"]+req.url}); //HTTPS Redirect
+        res.writeHead(301, {"Location":"https://"+req.headers.host+req.url}); //HTTPS Redirect
         res.end(); //Close connection.
 });
 

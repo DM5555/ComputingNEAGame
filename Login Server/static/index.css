@@ -1,0 +1,112 @@
+html {
+  width: 100%;
+}
+
+body {
+  margin: 10px
+}
+
+*::selection {
+  background-color: #ff9900;
+}
+
+#mainsection  {
+  text-align: center;
+}
+
+
+#biglogo {
+  width: 200px;
+  user-select: none;
+}
+
+h1,h3,p,a {
+  font-family: Tahoma;
+}
+
+h3 {
+  text-decoration: underline;
+}
+
+input {
+  border: none;
+  outline: none;
+  width: 25%;
+  border-radius: 3px;
+}
+
+button {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 16px;
+  width: 100px;
+  height: 40px;
+  background-color: white;
+  outline: none;
+  border-radius: 3px;
+  border: 1px solid #999;
+  color: black;
+}
+
+.signuponly {
+  display: none;
+}
+
+#switcher {
+  user-select: none;
+}
+
+#switcher>a {
+  padding: 3px;
+}
+
+#switcher>a:first-child {
+  margin-right: 3px;
+}
+
+#switcher>a:last-child {
+  margin-left:3px;
+}
+
+#switcher>a:not(.activeSwitcher):hover {
+  border-bottom: 2px solid #999;
+  cursor: pointer;
+}
+
+.activeSwitcher {
+  border-bottom: 2px solid #333;
+}
+
+button:hover {
+  border: 1px solid #333;
+  background: #333;
+  color: white;
+}
+
+input[type=text], input[type=password] {
+  border-bottom: 2px solid #999;
+}
+
+input[type=text]:focus, input[type=password]:focus {
+  border-bottom: 2px solid #333;
+}
+
+#errorBox {
+  width: 25%;
+  background-color: #fa4d4d;
+  color: white;
+  margin-bottom: 20px;
+  display: none;
+}
+
+/* Phone screen */
+@media screen and (max-width: 640px){
+  #biglogo {
+   width: 100%;
+  }
+
+  input, #errorBox {
+    width: 80%;
+  }
+}

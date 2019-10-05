@@ -4,14 +4,30 @@
     <meta charset="utf-8">
     <title>DomsGame</title>
     <script type="text/javascript" src="/static/index.js"></script>
+    <script type="text/javascript" src="/static/sharedscripts.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/index.css"/>
   </head>
   <body>
-    <h3>Welcome to DomsGame! There will be content here shortly.</h3>
-    <p>Test login form:</p>
-    <p>Username:</p>
-    <input type="text" id="usernameField"/>
-    <p>Password:</p>
-    <input type="password" id="passwordField"/>
-    <button id="loginButton">Log in</button>
+    <a href="/"><image src="/static/biglogo.svg" id="biglogo"></image></a>
+    <div id="mainsection">
+      <h1>Welcome to DomsGame!</h1>
+      <h3>Please login or create an account to continue.</h3>
+      <div id="errorBox"><p id="errorMsg">There has been an error.</p></div>
+      <div id="switcher">
+        <a id="loginSwitcher" class="activeSwitcher">Login</a>
+        <a id="signupSwitcher">Sign Up</a>
+      </div>
+      <form id="loginForm" onsubmit="login()" action="javascript:void(0);">
+        <p>Username:</p>
+        <input type="text" id="usernameField" autocomplete="username"/>
+        <p>Password:</p>
+        <input type="password" id="passwordField" autocomplete="password"/> <!-- MAKE SURE TO SUPPORT AUTOCOMPLETE FOR NEW PASSWORD -->
+        <p class="signuponly">Repeat Password:</p>
+        <input type="password" id="passwordRepeatField" class="signuponly" autocomplete="off"/>
+        <p class="signuponly">Authorisation Code:</p>
+        <input type="text" id="codeField" class="signuponly" autocomplete="off"/>
+        <button id="loginButton">Log in</button>
+      </form>
+    </div>
   </body>
 </html>

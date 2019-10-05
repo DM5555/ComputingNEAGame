@@ -1,5 +1,5 @@
 /*
-** LAST UPDATED 27/09/2019
+** LAST UPDATED 05/10/2019
 */
 
 /*MAIN USERS TABLE */
@@ -10,3 +10,12 @@ CREATE TABLE Users (
   PasswordHash CHAR(64),
   PasswordSalt CHAR(64)
 );
+
+/*ACCOUNT CREATION CODES*/
+CREATE TABLE Codes (
+  Code VARCHAR(16) NOT NULL UNIQUE,
+  Valid BOOLEAN NOT NULL
+);
+
+
+/* DO SESSIONS /*
