@@ -17,7 +17,8 @@ const crypto = require('crypto'); //For generating salts and hashes.
 const buffer = require('buffer'); //For procesing data (e.g: converting string into hex). This is pretty much a more advanced string class and a string can be converted to a buffer and vice-versa.
 const zlib = require('zlib'); //For compression.
 const stream = require('stream'); //For data streaming.
-const {validateUsername, validatePassword} = require('./static/sharedscripts.js');
+const {validateUsername, validatePassword, validateCode} = require('./static/sharedscripts.js'); //Shared scripts.
+
 
 const contentTypes = { //Content types list.
   "html" : "text/html",
@@ -29,7 +30,8 @@ const contentTypes = { //Content types list.
   "gif" : "image/gif",
   "jpeg" : "image/jpeg",
   "jpg" : "image/jpeg",
-  "svg" : "image/svg+xml"
+  "svg" : "image/svg+xml",
+  "pem" : "application/x-pem-file"
 };
 
 var dbconnection; //Make the database connection variable global
@@ -40,6 +42,21 @@ const iconData = fs.readFileSync("./favicon.ico");
 const iconDataCompressed = zlib.gzipSync(iconData); //Compressed version of icon.
 const indexPage = fs.readFileSync("./index.html");
 const indexPageCompressed = zlib.gzipSync(indexPage); //Compressed index page.
+
+//Preload token keys.
+const prvKeyFile = fs.readFileSync("./.secret/token_private.pem"); //Private key file.
+const pubKeyFile = fs.readFileSync("./.secret/token_public.pem"); //Public key file.
+
+//Private key password.
+const prvKeyPassword = fs.readFileSync("./.secret/token_password");
+
+
+//Create private key object from file string.
+const pviateKey = crypto.createPrivateKey({
+  format: "pem",
+  key: prvKeyFile,
+  passphrase: prvKeyPassword
+});
 
 //Get the lst modified time of the static directory.
 const staticModifyDates = getFilesLastModified(__dirname + "/static");
@@ -241,18 +258,73 @@ function apiCall(method, req, res, dbconn){ //When an api call is made to the /a
   if (req.method == "POST"){ //Post methods
     getPostData(req).then((params) => {
       if (method == "create-account"){ //Account creation
-        apiErrorInternal(res); //NOTE REMOVE THESE
+        createAccount(params, res, dbconn);
       } else if (method == "login"){ //Logging in.
-        apiErrorInternal(res); //Remove this too.
+        apiErrorInternal(res); //REMOVE THIS.
       } else {
         apiErrorDoesntExist(res); //Methods is nonexistent.
       }
     }).catch((e) => {
       apiErrorInternal(res); //Something weird happened.
+      throw e; //Throw the error.
     });
   } else {
     apiErrorDoesntExist(res); //Method nonexistent.
   }
+}
+
+function createAccount(params, res, dbconn){ //Creates an ccount in the database.
+  if (params === undefined){ //Make sure the params are defined.
+    apiErrorInvalidDetails(res); //No details passed.
+  } else if (params.username === undefined || params.password === undefined || params.code === undefined){ //Validity Check #1
+    apiErrorInvalidDetails(res); //Invalid details.
+  } else if (!validateUsername(params.username) || !validatePassword(params.password) || !validateCode(params.code)){ //Something is wrong with the data entered.
+    apiErrorInvalidDetails(res); //The username, password or code provided was invalid.
+  } else if (!validateCodeDB(params.code,dbconn)){ //Check the code on the database.
+    apiErrorInvalidCode(res); //Code is invalid.
+  } else { //No error yet.
+    
+  }
+}
+
+function validateCodeDB(code,dbconn){ //Validate codes with the database.
+  return new Promise((resolve,reject)=>{
+    const query = "SELECT Code FROM Codes WHERE Code = ? AND Valid = TRUE;"; //Query.
+    const insert = [code]; //Unsafe values in query.
+    const sql = mysql.format(query,insert); //Prevent sql injection.
+
+    dbconn.query(sql,(err,results,fields) => { //Call query to the database to check the code.
+      if (err) {//SQL Related Error.
+        reject(err);
+      } else { //No sql error
+        if (results.length > 0){
+          resolve(true); //There were results meaning the code is valid.
+        } else {
+          resolve(false); //No results means there was no authorisation code.
+        }
+      }
+    });
+  });
+}
+
+function useCodeDB(code,dbconn){ //Invalidate code.
+  return new Promise(function(resolve, reject){
+    const query = "UPDATE Codes SET Valid=FALSE WHERE Code = ? AND Valid = TRUE;"; //Query
+    const insert = [code];
+    const sql = mysql.format(query,insert); //Formatted query.
+
+    dbconn.query(sql, (err,results,fields)=>{ //Run the sql
+      if (err){ //Error check.
+        reject(err);
+      } else { //No errors found.
+        if (results.affectedRows > 0){
+          resolve(true);
+        } else {
+          resolve(false);
+        }
+      }
+    });
+  });
 }
 
 function apiErrorDoesntExist(res){ //Error 404 in JSON format.
@@ -273,21 +345,21 @@ function apiErrorInternal(res){ //Internal Server error in JSON format. This use
   }));
 }
 
-function apiErrorInvalidUsername(res){ //Invalid username! Error Code: 600
+function apiErrorInvalidDetails(res){ //Invalid detauks! Error Code: 600
   res.writeHead(400);
   res.end(JSON.stringify({
     error: true,
     errorCode: 600,
-    errorMsg: "Username does not meet the requirements."
+    errorMsg: "Your details did not satisfy the requirement for making an account."
   }));
 }
 
-function apiErrorInvalidPassword(res){ //Invalid password! Error Code: 601
+function apiErrorInvalidCode(res){ //Invalid code! Error Code: 601
   res.writeHead(400);
   res.end(JSON.stringify({
     error: true,
     errorCode: 601,
-    errorMsg: "Password does not meet the requirements."
+    errorMsg: "The code you entered is already used or never existed!"
   }));
 }
 
@@ -319,7 +391,9 @@ const server = https.createServer({
       } else {
         res.end(iconData); //Regular icon.
       }
-
+    } else if(path==="/tokenkey.pem"){ //Token public key
+      res.writeHead(200, generateHeaders("pem"), -1, gzipEnabled);
+      res.end(pubKeyFile);
     } else if (path === "/"){ //Index page.
       res.writeHead(200 , generateHeaders("html", -1, gzipEnabled));
       if (gzipEnabled){ //Whether to send the compressed version or not.
@@ -346,7 +420,7 @@ const server = https.createServer({
           }
 
           readStream.pipe(outputStream); //Pipe the read stream into the output stream.
-          
+
           readStream.on('error', (err)=>{ //File not found.
             error500(res); //Internal server error.
           });
