@@ -1,5 +1,5 @@
 "use strict"; //Prevent odd JS behavior.
-/* jshint esversion: 6 */
+/* jshint esversion: 8 */
 /* jshint node: true */
 
 /*
@@ -18,6 +18,7 @@ const buffer = require('buffer'); //For procesing data (e.g: converting string i
 const zlib = require('zlib'); //For compression.
 const stream = require('stream'); //For data streaming.
 const {validateUsername, validatePassword, validateCode} = require('./static/sharedscripts.js'); //Shared scripts.
+const base64url = require('base64url'); //Base 64 conversion.
 
 
 const contentTypes = { //Content types list.
@@ -52,7 +53,7 @@ const prvKeyPassword = fs.readFileSync("./.secret/token_password");
 
 
 //Create private key object from file string.
-const pviateKey = crypto.createPrivateKey({
+const privateKey = crypto.createPrivateKey({
   format: "pem",
   key: prvKeyFile,
   passphrase: prvKeyPassword
@@ -254,6 +255,26 @@ function hashPassword(password, salt){ //Generates the password hash from the pa
   return hasher.digest("hex"); //Grinds the meat in the metaphorical grinder. This will return a hex string.
 }
 
+function generateJWT(uuid,username){ //Generate a json web token for user authentication. This contains the username, userid and expiry time as well as jwt encoding info.
+  var header = { //JWT header.
+    alg: "RS256",
+    typ: "JWT"
+  };
+
+  var payload = { //JWT payload.
+    uuid: uuid,
+    username: username,
+    expiresMs: Date.now() + 86400000 //One day.
+  };
+
+  var mainCombo = base64url(JSON.stringify(header)) + "." + base64url(JSON.stringify(payload)); //Convert header and payload to base64.
+  var signer = crypto.createSign("RSA-SHA256"); //Create signer using RSA-SHA256.
+  signer.update(mainCombo); //Update signer with the data.
+  var signature = base64url(signer.sign(privateKey));//Sign the data.
+
+  return mainCombo + "." + signature; //Combain the main part and the signature.
+}
+
 function apiCall(method, req, res, dbconn){ //When an api call is made to the /api/ path.
   if (req.method == "POST"){ //Post methods
     getPostData(req).then((params) => {
@@ -273,17 +294,35 @@ function apiCall(method, req, res, dbconn){ //When an api call is made to the /a
   }
 }
 
-function createAccount(params, res, dbconn){ //Creates an ccount in the database.
+async function createAccount(params, res, dbconn){ //Creates an ccount in the database.
   if (params === undefined){ //Make sure the params are defined.
     apiErrorInvalidDetails(res); //No details passed.
   } else if (params.username === undefined || params.password === undefined || params.code === undefined){ //Validity Check #1
     apiErrorInvalidDetails(res); //Invalid details.
   } else if (!validateUsername(params.username) || !validatePassword(params.password) || !validateCode(params.code)){ //Something is wrong with the data entered.
     apiErrorInvalidDetails(res); //The username, password or code provided was invalid.
-  } else if (!validateCodeDB(params.code,dbconn)){ //Check the code on the database.
+  } else if (!await validateCodeDB(params.code,dbconn)){ //Check the code on the database.
     apiErrorInvalidCode(res); //Code is invalid.
-  } else { //No error yet.
-    
+  } else { //No error so create the user.
+    var uuid = generateUUID(); //User id.
+    var passwordSalt = randomSalt(); //Create password salt.
+    var passwordHash = hashPassword(params.password,params.salt); //Create password hash.
+
+    var query = "INSERT INTO Users (UUID,DisplayName,IsAdmin,PasswordHash,PasswordSalt) VALUES (?,?,FALSE,?,?)"; //Sql query for non admin user.
+    var insert = [uuid,params.username,passwordHash,passwordSalt]; //Create parameter set.
+    var sql = mysql.format(query,insert); //Create statement to be executed.
+
+    dbconn.query(sql,(err,results,fields) => { //Make call to database.
+      if (err){ //Error catching
+        throw err;
+      } else {
+        useCodeDB(params.code).then(() => { //Remove code from database.
+
+        }).catch((e) => {
+          if (e) throw e;
+        });
+      }
+    });
   }
 }
 
@@ -325,6 +364,13 @@ function useCodeDB(code,dbconn){ //Invalidate code.
       }
     });
   });
+}
+
+function generateUUID(){ //Generate a version 4 uuid.
+  var rdmBytes = crypto.randomBytes(16); //Generate 16 random bytes.
+  var hexString = rdmBytes.toString("hex"); //Convert to hex.
+  return hexString.slice(0,8) + "-" + hexString.slice(8,12) + "-4" + hexString.slice(13,16) + "-" + hexString.slice(16,20) + "-" + hexString.slice(20,32); //Put the hex into a uuid.
+
 }
 
 function apiErrorDoesntExist(res){ //Error 404 in JSON format.
