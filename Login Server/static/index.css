@@ -101,7 +101,7 @@ input[type=text]:focus, input[type=password]:focus {
 }
 
 /* Phone screen */
-@media screen and (max-width: 640px){
+@media (max-width: 400pt){
   #biglogo {
    width: 100%;
   }

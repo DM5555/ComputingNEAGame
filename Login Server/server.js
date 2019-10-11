@@ -246,13 +246,18 @@ function getPostData(req){ //Gets fields from a POST request.
 
 function randomSalt(){ //Creates a random string to be added to the password when hashed
   const randomBytes = crypto.randomBytes(32); //Generate 32 random bytes to be used as a salt.
-  return buffer.from(randomBytes).toString("hex"); //Convert this into a 64 byte hex string.
+  return Buffer.from(randomBytes).toString("hex"); //Convert this into a 64 byte hex string.
 }
 
 function hashPassword(password, salt){ //Generates the password hash from the password and the salt.
   const hasher = crypto.createHash("sha256"); //Create a function to hash data (I will be using the SHA-256 algorithm.). Think of this as a meat grinder when you throw in the meat and then turn the machine on to process it.
   hasher.update(password.concat(salt)); //Put the password with the salt appended to it into the hasher. (Puts meat in the grinder.)
   return hasher.digest("hex"); //Grinds the meat in the metaphorical grinder. This will return a hex string.
+}
+
+function base64Encode(data) {
+  var b64 = Buffer.from(data).toString('base64');
+  return b64.replace(/\=/g,"").replace(/\+/g,"-").replace(/\//,"_"); //Replaces characters and removes padding.
 }
 
 function generateJWT(uuid,username){ //Generate a json web token for user authentication. This contains the username, userid and expiry time as well as jwt encoding info.
@@ -267,10 +272,10 @@ function generateJWT(uuid,username){ //Generate a json web token for user authen
     expiresMs: Date.now() + 86400000 //One day.
   };
 
-  var mainCombo = base64url(JSON.stringify(header)) + "." + base64url(JSON.stringify(payload)); //Convert header and payload to base64.
+  var mainCombo = base64Encode(JSON.stringify(header)) + "." + base64Encode(JSON.stringify(payload)); //Convert header and payload to base64.
   var signer = crypto.createSign("RSA-SHA256"); //Create signer using RSA-SHA256.
   signer.update(mainCombo); //Update signer with the data.
-  var signature = base64url(signer.sign(privateKey));//Sign the data.
+  var signature = base64Encode(signer.sign(privateKey));//Sign the data.
 
   return mainCombo + "." + signature; //Combain the main part and the signature.
 }
@@ -281,7 +286,7 @@ function apiCall(method, req, res, dbconn){ //When an api call is made to the /a
       if (method == "create-account"){ //Account creation
         createAccount(params, res, dbconn);
       } else if (method == "login"){ //Logging in.
-        apiErrorInternal(res); //REMOVE THIS.
+        userLogin(params, res, dbconn);
       } else {
         apiErrorDoesntExist(res); //Methods is nonexistent.
       }
@@ -314,15 +319,34 @@ async function createAccount(params, res, dbconn){ //Creates an ccount in the da
 
     dbconn.query(sql,(err,results,fields) => { //Make call to database.
       if (err){ //Error catching
-        throw err;
+        if (err.code === "ER_DUP_ENTRY"){ //Username is taken.
+          apiErrorUsernameTaken(res);
+        } else {
+          throw err;
+        }
       } else {
-        useCodeDB(params.code).then(() => { //Remove code from database.
+        useCodeDB(params.code,dbconn).then(() => { //Remove code from database.
+          let jwt = generateJWT(uuid,params.username);
+
+          apiLoginUser(res, uuid, params.username, jwt);
 
         }).catch((e) => {
           if (e) throw e;
         });
       }
     });
+  }
+}
+
+function userLogin(params,res,dbconn){
+  if (params === undefined){ //No params.
+    apiErrorInvalidDetails(res);
+  } else if (params.username === undefined || params.password === undefined){ //Username or password is undefined.
+    apiErrorInvalidDetails(res);
+  } else if (!validateUsername(params.username) || !validatePassword(params.password)){ //Invalid username or password.
+    apiErrorInvalidDetails(res);
+  } else {
+    //TODO CHECK DETAILS IN DATABASE
   }
 }
 
@@ -370,7 +394,6 @@ function generateUUID(){ //Generate a version 4 uuid.
   var rdmBytes = crypto.randomBytes(16); //Generate 16 random bytes.
   var hexString = rdmBytes.toString("hex"); //Convert to hex.
   return hexString.slice(0,8) + "-" + hexString.slice(8,12) + "-4" + hexString.slice(13,16) + "-" + hexString.slice(16,20) + "-" + hexString.slice(20,32); //Put the hex into a uuid.
-
 }
 
 function apiErrorDoesntExist(res){ //Error 404 in JSON format.
@@ -396,7 +419,7 @@ function apiErrorInvalidDetails(res){ //Invalid detauks! Error Code: 600
   res.end(JSON.stringify({
     error: true,
     errorCode: 600,
-    errorMsg: "Your details did not satisfy the requirement for making an account."
+    errorMsg: "Your details did not satisfy the requirement for making an account or logging in."
   }));
 }
 
@@ -415,6 +438,27 @@ function apiErrorInvalidPassword(res){ //Invalid login credidentials! Error Code
     error: true,
     errorCode: 602,
     errorMsg: "The username or password you have entered is incorrect."
+  }));
+}
+
+function apiErrorUsernameTaken(res){ //Username taken! Error Code: 603
+  res.writeHead(400);
+  res.end(JSON.stringify({
+    error: true,
+    errorCode: 603,
+    errorMsg: "The username you entered is taken!"
+  }));
+}
+
+function apiLoginUser(res,uuid,username,token){ //Return the login data to the user.
+  res.writeHead(200); //Valid response.
+  res.end(JSON.stringify({ //Return the data. To the user.
+    error: false,
+    data: {
+      uuid: uuid,
+      username: username,
+      token: token
+    }
   }));
 }
 

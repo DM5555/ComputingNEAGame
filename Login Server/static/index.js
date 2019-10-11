@@ -115,6 +115,8 @@ window.onload = () => { //When page has loaded
       passwordRepeatField.autocomplete = "off";
       codeField.autocomplete = "off";
 
+      loginButton.innerText = "Log In"; //Change login button text.
+
       mode = "login";
     }
   };
@@ -134,6 +136,8 @@ window.onload = () => { //When page has loaded
       passwordField.autocomplete = "new-password"; //Set autocomplete attributes.
       passwordRepeatField.autocomplete = "new-password";
       codeField.autocomplete = "one-time-code";
+
+      loginButton.innerText = "Sign Up"; //Sign up button.
 
       mode = "signup"; //Switch mode
     }
