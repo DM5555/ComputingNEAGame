@@ -1,0 +1,11 @@
+{
+  "name": "domsgame-game",
+  "version": "0.0.1",
+  "description": "DomsGame",
+  "main": "index.js",
+  "dependencies": {
+    "typescript": "^3.6.4"
+  },
+  "author": "Dom",
+  "license": "ISC"
+}

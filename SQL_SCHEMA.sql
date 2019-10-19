@@ -5,7 +5,7 @@
 /*MAIN USERS TABLE */
 CREATE TABLE Users (
   UUID CHAR(36) NOT NULL PRIMARY KEY,
-  DisplayName VARCHAR(16) UNIQUE,
+  Username VARCHAR(16) UNIQUE,
   IsAdmin BOOLEAN,
   PasswordHash CHAR(64),
   PasswordSalt CHAR(64)

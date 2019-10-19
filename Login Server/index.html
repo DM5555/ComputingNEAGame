@@ -12,23 +12,48 @@
     <a href="/"><image src="/static/biglogo.svg" id="biglogo"></image></a>
     <div id="mainsection">
       <h1>Welcome to DomsGame!</h1>
-      <h3>Please login or create an account to continue.</h3>
-      <div id="errorBox"><p id="errorMsg">There has been an error.</p></div>
-      <div id="switcher">
-        <a id="loginSwitcher" class="activeSwitcher">Login</a>
-        <a id="signupSwitcher">Sign Up</a>
+      <h3 id="subtext">Please login or create an account to continue.</h3>
+      <div id="infoBox"><p id="infoMsg"></p></div>
+      <div id="notLoggedIn">
+        <div class="switcher">
+          <a id="loginSwitcher" class="activeSwitcher">Login</a>
+          <a id="signupSwitcher">Sign Up</a>
+        </div>
+        <form id="loginForm" onsubmit="pageJS.login()" action="javascript:void(0);">
+          <p>Username:</p>
+          <input type="text" id="usernameField" autocomplete="username"/>
+          <p>Password:</p>
+          <input type="password" id="passwordField" autocomplete="password"/> <!-- MAKE SURE TO SUPPORT AUTOCOMPLETE FOR NEW PASSWORD -->
+          <p class="signuponly">Repeat Password:</p>
+          <input type="password" id="passwordRepeatField" class="signuponly" autocomplete="off"/>
+          <p class="signuponly">Authorisation Code:</p>
+          <input type="text" id="codeField" class="signuponly" autocomplete="off"/>
+          <button id="loginButton">Log in</button>
+        </form>
       </div>
-      <form id="loginForm" onsubmit="login()" action="javascript:void(0);">
-        <p>Username:</p>
-        <input type="text" id="usernameField" autocomplete="username"/>
-        <p>Password:</p>
-        <input type="password" id="passwordField" autocomplete="password"/> <!-- MAKE SURE TO SUPPORT AUTOCOMPLETE FOR NEW PASSWORD -->
-        <p class="signuponly">Repeat Password:</p>
-        <input type="password" id="passwordRepeatField" class="signuponly" autocomplete="off"/>
-        <p class="signuponly">Authorisation Code:</p>
-        <input type="text" id="codeField" class="signuponly" autocomplete="off"/>
-        <button id="loginButton">Log in</button>
-      </form>
+      <div id="loggedIn">
+        <div id="loginInfo">
+          <div class="switcher">
+            <a id="serversSwitcher" class="activeSwitcher">Servers</a>
+            <a id="logoutSwitcher">Logout</a>
+            <a id="changePasswordSwitcher">Change Password</a>
+          </div>
+        </div>
+        <div id="serverlist">
+          <p>This section is work in progress.</p>
+        </div>
+        <form id="changePasswordForm">
+            <p class="adminOnly" id="changePasswordUsernameText">Username</p>
+            <input id="changePasswordUsername" class="adminOnly" type="text" autocomplete="username"/>
+            <p>Current Password:</p>
+            <input id="changePasswordOld" type="password" autocomplete="password"/>
+            <p>New Password:</p>
+            <input id="changePasswordNew" type="password" autocomplete="password"/>
+            <p>Repeat New Password:</p>
+            <input id="changePasswordNewRepeat" type="password" autocomplete="password"/>
+            <button id="changePasswordButton">Change Password</button>
+        </form>
+      </div>
     </div>
   </body>
 </html>

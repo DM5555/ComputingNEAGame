@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "start": "node server.js"
+  },
+  "name": "domsgame-login",
+  "description": "DomsGame login server.",
+  "version": "0.0.1",
+  "homepage": "https://www.domsgame.com/",
+  "dependencies": {
+    "mysql": "^2.17.1",
+    "node-mysql": "^0.4.2"
+  }
+}

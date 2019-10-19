@@ -53,23 +53,23 @@ button {
   display: none;
 }
 
-#switcher {
+.switcher {
   user-select: none;
 }
 
-#switcher>a {
+.switcher>a {
   padding: 3px;
 }
 
-#switcher>a:first-child {
+.switcher>a:first-child {
   margin-right: 3px;
 }
 
-#switcher>a:last-child {
+.switcher>a:last-child {
   margin-left:3px;
 }
 
-#switcher>a:not(.activeSwitcher):hover {
+.switcher>a:not(.activeSwitcher):hover {
   border-bottom: 2px solid #999;
   cursor: pointer;
 }
@@ -92,12 +92,27 @@ input[type=text]:focus, input[type=password]:focus {
   border-bottom: 2px solid #333;
 }
 
-#errorBox {
+#loggedIn {
+  display: none;
+}
+
+#changePasswordForm {
+  display: none;
+}
+
+.adminOnly {
+  display: none;
+}
+
+
+#infoBox {
   width: 25%;
-  background-color: #fa4d4d;
+  background-color: #7F7F7F;
   color: white;
   margin-bottom: 20px;
   display: none;
+  padding-left: 1em;
+  padding-right: 1em;
 }
 
 /* Phone screen */
@@ -106,7 +121,7 @@ input[type=text]:focus, input[type=password]:focus {
    width: 100%;
   }
 
-  input, #errorBox {
+  input, #infoBox {
     width: 80%;
   }
 }

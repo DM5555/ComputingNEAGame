@@ -17,7 +17,7 @@ const crypto = require('crypto'); //For generating salts and hashes.
 const buffer = require('buffer'); //For procesing data (e.g: converting string into hex). This is pretty much a more advanced string class and a string can be converted to a buffer and vice-versa.
 const zlib = require('zlib'); //For compression.
 const stream = require('stream'); //For data streaming.
-const {validateUsername, validatePassword, validateCode} = require('./static/sharedscripts.js'); //Shared scripts.
+const {validateUsername, validatePassword, validateCode, base64Encode, base64Decode} = require('./static/sharedscripts.js'); //Shared scripts.
 const base64url = require('base64url'); //Base 64 conversion.
 
 
@@ -59,6 +59,10 @@ const privateKey = crypto.createPrivateKey({
   passphrase: prvKeyPassword
 });
 
+//IP BLACKLISTER FOR API ABUSE.
+var apiAccessList = {};
+const apiLimit = 20;
+
 //Get the lst modified time of the static directory.
 const staticModifyDates = getFilesLastModified(__dirname + "/static");
 
@@ -97,6 +101,11 @@ function checkPathSafe(uri){ //Make sure passed path is safe, and return a useab
     };
   }
 
+  if (uri.length > 128){ //Length limitation
+    return {
+      status: "toolong"
+    };
+  }
 
   if (checkPathChars(pathname)){ //alphanumerical , "." and "/" allowed but ".." is not.
     return {
@@ -215,6 +224,11 @@ function error401(res){ //Used when a path cannot be trusted and no attempt will
   res.end("401: The path was invalid or you do not have access!");
 }
 
+function error414(res){ //Input to long.
+  res.writeHead(414, generateHeaders("html",-1,false));
+  res.end("414: The URI is too long.");
+}
+
 function error500(res){ //Used when something went wrong.
   res.writeHead(500, generateHeaders("html",-1,false));
   res.end("500: Internal server error.");
@@ -255,12 +269,9 @@ function hashPassword(password, salt){ //Generates the password hash from the pa
   return hasher.digest("hex"); //Grinds the meat in the metaphorical grinder. This will return a hex string.
 }
 
-function base64Encode(data) {
-  var b64 = Buffer.from(data).toString('base64');
-  return b64.replace(/\=/g,"").replace(/\+/g,"-").replace(/\//,"_"); //Replaces characters and removes padding.
-}
 
-function generateJWT(uuid,username){ //Generate a json web token for user authentication. This contains the username, userid and expiry time as well as jwt encoding info.
+
+function generateJWT(uuid,username,isAdmin){ //Generate a json web token for user authentication. This contains the username, userid and expiry time as well as jwt encoding info.
   var header = { //JWT header.
     alg: "RS256",
     typ: "JWT"
@@ -272,6 +283,10 @@ function generateJWT(uuid,username){ //Generate a json web token for user authen
     expiresMs: Date.now() + 86400000 //One day.
   };
 
+  if (isAdmin){ //For admins.
+    payload.isAdmin = true;
+  }
+
   var mainCombo = base64Encode(JSON.stringify(header)) + "." + base64Encode(JSON.stringify(payload)); //Convert header and payload to base64.
   var signer = crypto.createSign("RSA-SHA256"); //Create signer using RSA-SHA256.
   signer.update(mainCombo); //Update signer with the data.
@@ -281,22 +296,40 @@ function generateJWT(uuid,username){ //Generate a json web token for user authen
 }
 
 function apiCall(method, req, res, dbconn){ //When an api call is made to the /api/ path.
-  if (req.method == "POST"){ //Post methods
-    getPostData(req).then((params) => {
-      if (method == "create-account"){ //Account creation
-        createAccount(params, res, dbconn);
-      } else if (method == "login"){ //Logging in.
-        userLogin(params, res, dbconn);
-      } else {
-        apiErrorDoesntExist(res); //Methods is nonexistent.
-      }
-    }).catch((e) => {
-      apiErrorInternal(res); //Something weird happened.
-      throw e; //Throw the error.
-    });
-  } else {
-    apiErrorDoesntExist(res); //Method nonexistent.
+  var ipAddress = req.connection.remoteAddress;
+
+  if (typeof apiAccessList[ipAddress] === "undefined"){ //IP is not recorded.
+    apiAccessList[ipAddress] = 0; //Log IP temporarily.
   }
+
+  if (apiAccessList[ipAddress] < apiLimit){ //User is under limit.
+    if (req.method == "POST"){ //Post methods
+      getPostData(req).then((params) => {
+        if (method == "create-account"){ //Account creation
+          createAccount(params, res, dbconn);
+        } else if (method == "login"){ //Logging in.
+          userLogin(params, res, dbconn);
+        } else {
+          apiErrorDoesntExist(res); //Methods is nonexistent.
+        }
+      }).catch((e) => {
+        apiErrorInternal(res); //Something weird happened.
+        throw e; //Throw the error.
+      });
+    } else {
+      apiErrorDoesntExist(res); //Method nonexistent.
+    }
+  } else if (apiAccessList[ipAddress] < apiLimit*3){ //Return too many requets. If the user is under 3 times the limit.
+    apiErrorTooManyRequests(res);
+  } else { //Drop connection without JSON after 10 seconds.
+    setTimeout(function () {
+      res.writeHead(429);
+      res.end();
+    }, 10000);
+  }
+
+  apiAccessList[ipAddress]++; //Increment counter by 1.
+
 }
 
 async function createAccount(params, res, dbconn){ //Creates an ccount in the database.
@@ -311,9 +344,9 @@ async function createAccount(params, res, dbconn){ //Creates an ccount in the da
   } else { //No error so create the user.
     var uuid = generateUUID(); //User id.
     var passwordSalt = randomSalt(); //Create password salt.
-    var passwordHash = hashPassword(params.password,params.salt); //Create password hash.
+    var passwordHash = hashPassword(params.password,passwordSalt); //Create password hash.
 
-    var query = "INSERT INTO Users (UUID,DisplayName,IsAdmin,PasswordHash,PasswordSalt) VALUES (?,?,FALSE,?,?)"; //Sql query for non admin user.
+    var query = "INSERT INTO Users (UUID,Username,IsAdmin,PasswordHash,PasswordSalt) VALUES (?,?,FALSE,?,?)"; //Sql query for non admin user.
     var insert = [uuid,params.username,passwordHash,passwordSalt]; //Create parameter set.
     var sql = mysql.format(query,insert); //Create statement to be executed.
 
@@ -326,9 +359,9 @@ async function createAccount(params, res, dbconn){ //Creates an ccount in the da
         }
       } else {
         useCodeDB(params.code,dbconn).then(() => { //Remove code from database.
-          let jwt = generateJWT(uuid,params.username);
+          let jwt = generateJWT(uuid,params.username,false);
 
-          apiLoginUser(res, uuid, params.username, jwt);
+          apiLoginUser(res, jwt);
 
         }).catch((e) => {
           if (e) throw e;
@@ -346,7 +379,31 @@ function userLogin(params,res,dbconn){
   } else if (!validateUsername(params.username) || !validatePassword(params.password)){ //Invalid username or password.
     apiErrorInvalidDetails(res);
   } else {
-    //TODO CHECK DETAILS IN DATABASE
+    const query = "SELECT * FROM Users WHERE Username=?"; //Select username data.
+    const insert = [params.username]; //Query inserts.
+    const sql = mysql.format(query,insert); //Formatted sql.
+
+    dbconn.query(sql, (err,results,fields) => { //Make query to database.
+      if (err) {
+        apiErrorInternal(res);
+      } else { //Results retrieved.
+        if (results.length > 0){ //An account exists.
+          let result = results[0]; //Select first (and only) result.
+
+          if (result.PasswordHash === hashPassword(params.password,result.PasswordSalt)){ //Regenerate the password hash from the salt and input and verify it.
+            let jwt = generateJWT(result.UUID, result.Username, result.IsAdmin==1); //Generate a validation token.
+
+            apiLoginUser(res,jwt); //Log the user in.
+
+          } else {
+            apiErrorInvalidPassword(res); //The password was wrong.
+          }
+
+        } else { //No Results.
+          apiErrorInvalidPassword(res); //Send an invalid login error so that the user/bot does not know if the user exists.
+        }
+      }
+    });
   }
 }
 
@@ -376,7 +433,7 @@ function useCodeDB(code,dbconn){ //Invalidate code.
     const insert = [code];
     const sql = mysql.format(query,insert); //Formatted query.
 
-    dbconn.query(sql, (err,results,fields)=>{ //Run the sql
+    dbconn.query(sql, (err,results,fields) => { //Run the sql
       if (err){ //Error check.
         reject(err);
       } else { //No errors found.
@@ -450,13 +507,20 @@ function apiErrorUsernameTaken(res){ //Username taken! Error Code: 603
   }));
 }
 
-function apiLoginUser(res,uuid,username,token){ //Return the login data to the user.
+function apiErrorTooManyRequests(res){ //Too many requests! Error Code: 429
+  res.writeHead(429);
+  res.end(JSON.stringify({
+    error: true,
+    errorCode: 429,
+    errorMsg: "Too many requests!"
+  }));
+}
+
+function apiLoginUser(res,token){ //Return the login data to the user.
   res.writeHead(200); //Valid response.
   res.end(JSON.stringify({ //Return the data. To the user.
     error: false,
     data: {
-      uuid: uuid,
-      username: username,
       token: token
     }
   }));
@@ -534,6 +598,8 @@ const server = https.createServer({
     error404(res);
   } else if (urlstate.status == "unsafe"){ //Disallowed characters
     error401(res);
+  } else if (urlstate.status == "toolong"){ //Too long url.
+    error414(res);
   } else { //Default case. This could should never be called but is there to prevent the server from hanging or crashing.
     error404(res);
   }
@@ -562,3 +628,7 @@ dbconnection.connect((err) => { //Attempt the connection to the server
   httpserver.listen(80); //Listens on port 80 to redirect incoming insecure HTTP traffic.
   server.listen(443); //Run the server on the default https port 443.
 });
+
+setInterval(function () { //Clears recent ips every minute.
+  apiAccessList = {};
+}, 60000);

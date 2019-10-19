@@ -44,8 +44,30 @@ function validateCode(code){ //Doesnt actually verify the code, just validates i
   }
 }
 
-if (module !== undefined){ //Only for node.
+function base64Encode(data) { //Encodes data into base 64.
+  var b64;
+  if (typeof btoa === "undefined"){ //For node.
+    b64 = Buffer.from(data).toString('base64'); //Convert to base64
+  } else { //For browser
+    b64 = btoa(data); //Convert to base64
+  }
+  return b64.replace(/\=/g,"").replace(/\+/g,"-").replace(/\//,"_"); //Replaces characters and removes padding.
+}
+
+function base64Decode(data){ //Decodes dta from base64.
+  var b64 = data.replace(/\-/g,"+").replace(/\_/g,"/"); //Replace characters.
+  b64 += "=".repeat((3-(b64.length%3))%3); //Re-adds = padding.
+  if (typeof atob === "undefined"){ //node
+    return Buffer.from(b64, "base64").toString(); //Main conversion.
+  } else { //browser.
+    return atob(b64); //Main conversion
+  }
+}
+
+if (typeof module !== "undefined"){ //Only for node.
   module.exports.validateUsername = validateUsername;
   module.exports.validatePassword = validatePassword;
   module.exports.validateCode = validateCode;
+  module.exports.base64Encode = base64Encode;
+  module.exports.base64Decode = base64Decode;
 }
