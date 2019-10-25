@@ -35,7 +35,7 @@ const contentTypes = { //Content types list.
   "pem" : "application/x-pem-file"
 };
 
-var dbconnection; //Make the database connection variable global
+var dbconnection; //Make the database connection variable global so that all methods can access it.
 
 
 //Preload icon and index page.

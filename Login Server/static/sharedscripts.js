@@ -64,6 +64,8 @@ function base64Decode(data){ //Decodes dta from base64.
   }
 }
 
+
+
 if (typeof module !== "undefined"){ //Only for node.
   module.exports.validateUsername = validateUsername;
   module.exports.validatePassword = validatePassword;
