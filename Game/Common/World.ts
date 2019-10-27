@@ -22,8 +22,8 @@ export class World{
   }
 
   public removeCollisionGroup(cg:CollisionGroup):boolean{ //Remove a collisiongroup from the list. Will probably be redundant.
-    let index:number = this.collisionGroups.lastIndexOf(cg);
-    if (index == -1){
+    let index:number = this.collisionGroups.indexOf(cg);
+    if (index === -1){
       return false;
     } else {
       delete this.collisionGroups[index];
