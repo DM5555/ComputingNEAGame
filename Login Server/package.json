@@ -7,6 +7,8 @@
   "version": "0.0.1",
   "homepage": "https://www.domsgame.com/",
   "dependencies": {
+    "@types/node": "^12.11.7",
+    "@types/ws": "^6.0.3",
     "mysql": "^2.17.1",
     "node-mysql": "^0.4.2"
   }

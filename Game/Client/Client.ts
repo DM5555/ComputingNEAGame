@@ -1,12 +1,12 @@
 /*
-The main class for the server.
+The main class for the client.
 */
 
 import {InvokingInstance} from "../Common/InvokingInstance";
 
-export class Server extends InvokingInstance{
+export class Client extends InvokingInstance{
   constructor(){
     super(); //Invoke superclass.
-    console.log("Made new server object!");
+    console.log("Made new client object!");
   }
 }
