@@ -6,7 +6,8 @@
       "parameter",
       "property-declaration",
       "variable-declaration",
-      "member-variable-declaration"
+      "member-variable-declaration",
+      "arrow-parameter"
     ]
   }
 }

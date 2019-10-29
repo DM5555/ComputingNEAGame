@@ -18,7 +18,6 @@ const buffer = require('buffer'); //For procesing data (e.g: converting string i
 const zlib = require('zlib'); //For compression.
 const stream = require('stream'); //For data streaming.
 const {validateUsername, validatePassword, validateCode, base64Encode, base64Decode} = require('./static/sharedscripts.js'); //Shared scripts.
-const base64url = require('base64url'); //Base 64 conversion.
 
 
 const contentTypes = { //Content types list.
@@ -38,11 +37,13 @@ const contentTypes = { //Content types list.
 var dbconnection; //Make the database connection variable global so that all methods can access it.
 
 
-//Preload icon and index page.
+//Preload icon, index page and game page.
 const iconData = fs.readFileSync("./favicon.ico");
 const iconDataCompressed = zlib.gzipSync(iconData); //Compressed version of icon.
 const indexPage = fs.readFileSync("./index.html");
 const indexPageCompressed = zlib.gzipSync(indexPage); //Compressed index page.
+const gamePage = fs.readFileSync("../Game/game.html"); //Read Game from static dir.
+const gamePageCompressed = zlib.gzipSync(gamePage);
 
 //Preload token keys.
 const prvKeyFile = fs.readFileSync("./.secret/token_private.pem"); //Private key file.
@@ -71,7 +72,7 @@ function checkPathChars(uri){ //Regular expressions are a disgrace to society. T
   for(var i in uri){
     var chrcode = uri.charCodeAt(i);
 
-    if ((chrcode >= 45 && chrcode <= 90)||(chrcode >= 97 && chrcode <= 122)){ // "-./ABCDEGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" are allowed. Everything else is blocked.
+    if ((chrcode >= 45 && chrcode <= 90)||(chrcode >= 97 && chrcode <= 122)||(chrcode == 95)){ // "-./ABCDEGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_" are allowed. Everything else is blocked.
       if ((chrcode === 46 && prevchrcode === 46) || (chrcode === 47 && prevchrcode === 47)){ //Prevent ".." and "//".
         return false;
       }
@@ -527,6 +528,27 @@ function apiLoginUser(res,token){ //Return the login data to the user.
 }
 
 
+function resolveStaticPath(pth){ //Resolve the static path to the /static directory or the game files.
+  if (pth.startsWith("game/")){ //It's game file.
+    let capitalLetter = false;
+    if (pth.endsWith(".js")){ //JS and TS files start with an uppercase first letter.
+      capitalLetter = true;
+    }
+
+    let gamePath = pth.substr("5"); //Remove "game/" from the path.
+    let returnPath = __dirname + "/../Game/src/"; //Path to be returned
+	
+    if (capitalLetter){
+      return returnPath + fileName.charAt(0).toUpperCase() + fileName.substr(1); //With first letter capitalised.
+    } else {
+      return returnPath + fileName; //Return without capitalisation.
+    }
+
+  } else { //Regular static file.
+    return __dirname + "/static/" + pth;
+  }
+}
+
 
 const server = https.createServer({
   cert: fs.readFileSync("./.secret/cert.crt"), //Open the server certificate.
@@ -555,35 +577,47 @@ const server = https.createServer({
       } else {
         res.end(indexPage);
       }
+    } else if (path === "/game"){ //Game page.
+      res.writeHead(200, generateHeaders("html", -1, gzipEnabled));
+      if (gzipEnabled){
+        res.end(gamePageCompressed);
+      } else {
+        res.end(gamePage);
+      }
     } else if (path.startsWith("/static/")){ //Static content directory: Just "/static" without the "/"" after is not accepted.
       let customPath = path.substr(8); //The length of "/static/" is 8 characters long.
-      if (shouldFileBeSent(req.headers, __dirname + "/static/" + customPath)){ //Check if the file should actually be sent as the user may have cached it.
-        if (fs.existsSync(__dirname + "/static/" + customPath)){ //Check if the file exists.
-          res.writeHead(200,generateHeaders(getFileType(customPath),86400,gzipEnabled)); //Send the headers with an exipiry time of 1 day.
-          var readStream = fs.createReadStream(__dirname + "/static/" + customPath); //Open the file.
-          var outputStream; //Define the output stream.
-          if (gzipEnabled){ //For compression
-            outputStream = zlib.createGzip(); //Create a gzip compressor.
-            outputStream.pipe(res); //Pipe the compressed data into the response.
+      let filePath = resolveStaticPath(customPath); //Resolve the static path.
+      if (filePath !== -1){ //Make sure it isn't blocked.
+        if (shouldFileBeSent(req.headers, filePath)){ //Check if the file should actually be sent as the user may have cached it.
+          if (fs.existsSync(filePath)){ //Check if the file exists.
+            res.writeHead(200,generateHeaders(getFileType(customPath),86400,gzipEnabled)); //Send the headers with an exipiry time of 1 day.
+            var readStream = fs.createReadStream(filePath); //Open the file.
+            var outputStream; //Define the output stream.
+            if (gzipEnabled){ //For compression
+              outputStream = zlib.createGzip(); //Create a gzip compressor.
+              outputStream.pipe(res); //Pipe the compressed data into the response.
 
-            outputStream.on('error',() => { //Error handling.
-              error500(res);
+              outputStream.on('error',() => { //Error handling.
+                error500(res);
+              });
+            } else {
+              outputStream = res; //Default the output stream to the response;
+            }
+
+            readStream.pipe(outputStream); //Pipe the read stream into the output stream.
+
+            readStream.on('error', (err)=>{ //File not found.
+              error500(res); //Internal server error.
             });
-          } else {
-            outputStream = res; //Default the output stream to the response;
+          } else { //File not found.
+            error404(res);
           }
-
-          readStream.pipe(outputStream); //Pipe the read stream into the output stream.
-
-          readStream.on('error', (err)=>{ //File not found.
-            error500(res); //Internal server error.
-          });
-        } else { //File not found.
-          error404(res);
+        } else {
+          res.writeHead(304,generateHeaders("",-1,false)); //Respond with 304 file is already there.
+          res.end();
         }
       } else {
-        res.writeHead(304,generateHeaders("",-1,false)); //Respond with 304 file is already there.
-        res.end();
+        error404(res);
       }
 
     } else if(path.startsWith("/api/")){ //Api (Ccalls must never end with a /)

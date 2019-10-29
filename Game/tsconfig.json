@@ -1,0 +1,10 @@
+{
+  "compileOnSave": true,
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "target": "es2017",
+    "traceResolution": true,
+    "types": [
+    ]
+  }
+}

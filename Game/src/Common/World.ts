@@ -14,6 +14,8 @@ export class World{
   constructor(sizeX:number, sizeY:number){ //Create a new world with the given dimensions.
     this.sizeX = sizeX;
     this.sizeY = sizeY;
+
+    console.log("New world created!");
   }
 
   public addCollisionGroup():void{ //Create and add a collision group to the list. Collision groups belong to the world instance.

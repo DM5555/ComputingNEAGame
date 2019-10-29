@@ -8,7 +8,7 @@ export class CollisionGroup{
   private collidingGroups:CollisionGroup[]; //Collision groups that this collides with.
 
   constructor(){
-    
+
   }
 
   public addEntity(e:Entity):void{ //Add an entity to the entities list.
