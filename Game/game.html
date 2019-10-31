@@ -3,12 +3,31 @@
   <head>
     <meta charset="utf-8">
     <title>DomsGame</title>
-    <script>
-      exports = {}
-    </script>
-    <script src="/static/game/public_files/startclient.js" type="text/javascript"></script>
+    <script src="/static/dependencies/require.js" type="text/javascript"></script>
+    <script src="/static/dependencies/pixi.min.js" type="text/javascript"></script>
+    <script src="/static/game/dist_min/domsgame.js" type="text/javascript"></script>
+    <script src="/static/startgame.js" type="text/javascript"></script>
+    <style>
+      html, body {
+        width: 100vw;
+        height: 100vh;
+        margin:0;
+        left:0;
+        top:0;
+      }
+      #gamecontainer {
+        width: 100vw;
+        height: 100vh;
+      }
+
+      canvas {
+        width: 100vw;
+        height: 100vh;
+        display:block;
+      }
+    </style>
   </head>
   <body>
-    <p>This is currently in test.</p>
+    <div id="gamecontainer"></div>
   </body>
 </html>

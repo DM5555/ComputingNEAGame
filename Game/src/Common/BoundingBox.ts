@@ -7,8 +7,9 @@ export class BoundingBox {
 
   public nodes:Vector2[]; //This is the list of points of the bounding box. This is publicly accessible.
 
-  constructor(nodes:Vector2[]){ //Create a new bounding box with the nodes in order so that the box is in that shape.
-    this.nodes = nodes; //Set the nodes to the current node.
+  constructor(nodes?:Vector2[]){ //Create a new bounding box with the nodes in order so that the box is in that shape.
+    this.nodes = []; //Create new node list.
+    Object.assign(this.nodes,nodes); //Copy nodes across to the object nodes from the ones passed in the constructor.
   }
 
 }

@@ -6,14 +6,13 @@ Basically, this is the common class (for client and server) for my game.
 import {World} from "./World";
 
 export class GameState {
-  private world:World;
+  public readonly world:World;
   private config:object;
 
   /**Create a new game using the properties defined in the config.json file.*/
   constructor(cfg:object){
     this.config = cfg; //Load config
-
-    this.world = new World(this.config["sizeX"], this.config["sizeY"]); //Risky
+    this.world = new World(this.config["width"], this.config["height"]); //Risky
 
   }
 

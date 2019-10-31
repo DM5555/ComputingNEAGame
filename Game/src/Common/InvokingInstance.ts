@@ -7,11 +7,12 @@ import {Context} from "./Context";
 import {FileLoader} from "./FileLoader";
 
 export abstract class InvokingInstance {
-  private gameState:GameState;
-  private fileLoader:FileLoader;
-  private config:object;
+  protected gameState:GameState;
+  protected fileLoader:FileLoader;
+  protected config:object;
 
-  constructor(ctx:Context){
+  //This is an async function so it needs a callback.
+  constructor(ctx:Context,callback:()=>void){
     if (ctx === Context.CLIENT){ //Define the file loader based on whether it is client or server.
       this.fileLoader = new (require("../Client/ClientFileLoader").ClientFileLoader)();
     } else if (ctx === Context.SERVER){
@@ -23,10 +24,17 @@ export abstract class InvokingInstance {
     this.fileLoader.loadConfig().then((cfg:object)=>{
       this.config = cfg;
       this.gameState = new GameState(this.config); //Create a gamestate instance.
+      callback();
       console.log("GameState created!");
-    }).catch((errCode:number)=>{
-      console.error("Game state could not be created as the configuration file failed to load! Error Code:" + errCode);
+    }).catch((err:any)=>{
+      if (err instanceof Error){
+        console.error("ACTUAL ERROR OCCURRED");
+        throw err;
+      } else {
+        console.error("Game state could not be created as the configuration file failed to load! Error Code: " + err);
+      }
     });
   }
+
 
 }

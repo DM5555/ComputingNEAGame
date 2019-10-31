@@ -529,21 +529,9 @@ function apiLoginUser(res,token){ //Return the login data to the user.
 
 
 function resolveStaticPath(pth){ //Resolve the static path to the /static directory or the game files.
-  if (pth.startsWith("game/")){ //It's game file.
-    let capitalLetter = false;
-    if (pth.endsWith(".js")){ //JS and TS files start with an uppercase first letter.
-      capitalLetter = true;
-    }
-
-    let gamePath = pth.substr("5"); //Remove "game/" from the path.
-    let returnPath = __dirname + "/../Game/src/"; //Path to be returned
-	
-    if (capitalLetter){
-      return returnPath + fileName.charAt(0).toUpperCase() + fileName.substr(1); //With first letter capitalised.
-    } else {
-      return returnPath + fileName; //Return without capitalisation.
-    }
-
+  if (pth.startsWith("game/")){ //Game file
+	let gamePth = pth.substr(5); //Remove game/ from the path.
+    return __dirname + "/../Game/" + gamePth;
   } else { //Regular static file.
     return __dirname + "/static/" + pth;
   }
