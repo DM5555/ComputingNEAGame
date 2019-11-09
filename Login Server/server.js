@@ -296,6 +296,10 @@ function generateJWT(uuid,username,isAdmin){ //Generate a json web token for use
   return mainCombo + "." + signature; //Combain the main part and the signature.
 }
 
+function verifyJWT(token){ //Verify the json web token.
+  
+}
+
 function apiCall(method, req, res, dbconn){ //When an api call is made to the /api/ path.
   var ipAddress = req.connection.remoteAddress;
 

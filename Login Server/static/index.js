@@ -112,7 +112,9 @@ class PageJS { //A class is used to avoid putting variables in the global scope.
           params = "username=" + encodeURIComponent(this.usernameField.value) + "&password=" + encodeURIComponent(this.passwordField.value);
 
           this.makeRequest("/api/login","POST", params).then((responseData) => {
-            this.showMessage("Logged in successfully!", "success");
+            this.showMessage("Logged in successfully!", "success"); //Update the message box to show a successful login.
+            this.loginAs(responseData.data.token); //Login as the user with the token recieved.
+
           }).catch((e) => {
             if (typeof e !== "undefined"){ //An actual error.
               throw e;
@@ -220,19 +222,14 @@ class PageJS { //A class is used to avoid putting variables in the global scope.
     }
   }
 
-  loginAs(token){ //Login as a user.
+  loginAs(token){ //Login as a user from the token given.
     document.cookie = "token=" + token + ";"; //Set the document cookie.
 
-    var headerEnd = token.indexOf(".");
-    var headerB64 = token.slice(0,headerEnd); //Get JWT header.
-    var remainingToken = token.slice(headerEnd+1); //Remove header part of token.
+    var tokenData = splitJWT(token); //Split the JSON web token into parts.
 
-    var payloadEnd = remainingToken.indexOf(".");
-    var payloadB64 = remainingToken.slice(0,payloadEnd); //Get JWT payload.
+    this.notLoggedIn.style.display = "none";
+    this.loggedIn.style.display = "block";
 
-    var signature = remainingToken.slice(payloadEnd+1); //Get JWT signature.
-
-    userData = JSON.parse(atob(payloadB64)); //Parse the payload and set the userdata to it.
   }
 }
 

@@ -64,6 +64,24 @@ function base64Decode(data){ //Decodes dta from base64.
   }
 }
 
+function splitJWT(token){ //Split a JSON web token. Into the header and the signature.
+  var headerEnd = token.indexOf(".");
+  var headerB64 = token.slice(0,headerEnd); //Get JWT header.
+  var remainingToken = token.slice(headerEnd+1); //Remove header part of token.
+
+  var payloadEnd = remainingToken.indexOf(".");
+  var payloadB64 = remainingToken.slice(0,payloadEnd); //Get JWT payload.
+
+  var signature = remainingToken.slice(payloadEnd+1); //Get JWT signature.
+
+  var userData = JSON.parse(base64Decode(payloadB64)); //Parse the payload and set the userdata to it.
+
+  return {
+    userData:userData,
+    signature:signature
+  }
+}
+
 
 
 if (typeof module !== "undefined"){ //Only for node.
@@ -72,4 +90,5 @@ if (typeof module !== "undefined"){ //Only for node.
   module.exports.validateCode = validateCode;
   module.exports.base64Encode = base64Encode;
   module.exports.base64Decode = base64Decode;
+  module.exports.splitJWT = splitJWT;
 }

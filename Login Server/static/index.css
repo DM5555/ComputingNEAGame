@@ -1,9 +1,6 @@
 html {
   width: 100%;
-}
-
-body {
-  margin: 10px
+  min-height: 100%;
 }
 
 *::selection {
@@ -12,16 +9,33 @@ body {
 
 #mainsection  {
   text-align: center;
+  margin: 10px;
 }
 
+body {
+  margin: 0;
+  min-height: 100%;
+}
 
 #biglogo {
   width: 200px;
   user-select: none;
+  margin: 10px;
 }
 
-h1,h3,p,a {
+* {
   font-family: Tahoma;
+}
+
+#footer {
+  bottom: 0;
+  left: 0;
+  background-color: #ccc;
+  padding: 20px;
+  color: #333;
+  width: 100%;
+  position: absolute;
+  box-sizing: border-box;
 }
 
 h3 {
