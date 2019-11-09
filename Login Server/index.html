@@ -4,60 +4,70 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <title>DomsGame</title>
+    <script type="text/javascript" src="/static/stopIE.js"></script>
     <script type="text/javascript" src="/static/index.js"></script>
     <script type="text/javascript" src="/static/sharedscripts.js"></script>
     <link rel="stylesheet" type="text/css" href="/static/index.css"/>
     <meta name="theme-color" content="#ff9900">
   </head>
   <body>
-    <a href="/"><image src="/static/biglogo.svg" id="biglogo"></image></a>
-    <div id="mainsection">
-      <h1>Welcome to DomsGame!</h1>
-      <h3 id="subtext">Please login or create an account to continue.</h3>
-      <div id="infoBox"><p id="infoMsg"></p></div>
-      <div id="notLoggedIn">
-        <div class="switcher">
-          <a id="loginSwitcher" class="activeSwitcher">Login</a>
-          <a id="signupSwitcher">Sign Up</a>
-        </div>
-        <form id="loginForm" onsubmit="pageJS.login()" action="javascript:void(0);">
-          <p>Username:</p>
-          <input type="text" id="usernameField" autocomplete="username"/>
-          <p>Password:</p>
-          <input type="password" id="passwordField" autocomplete="password"/> <!-- MAKE SURE TO SUPPORT AUTOCOMPLETE FOR NEW PASSWORD -->
-          <p class="signuponly">Repeat Password:</p>
-          <input type="password" id="passwordRepeatField" class="signuponly" autocomplete="off"/>
-          <p class="signuponly">Authorisation Code:</p>
-          <input type="text" id="codeField" class="signuponly" autocomplete="off"/>
-          <button id="loginButton">Log in</button>
-        </form>
-      </div>
-      <div id="loggedIn">
-        <div id="loginInfo">
-          <div class="switcher">
-            <a id="serversSwitcher" class="activeSwitcher">Servers</a>
-            <a id="logoutSwitcher">Logout</a>
-            <a id="changePasswordSwitcher">Change Password</a>
+    <div id="content-wrapper">
+      <div id="body">
+        <a href="/"><img src="/static/biglogo.svg" id="biglogo"></a>
+        <div id="mainsection">
+          <h1>Welcome to DomsGame!</h1>
+          <h3 id="subtext">Please login or create an account to continue.</h3>
+          <noscript>
+              <div class="messageBox">
+                <p>You are using noscript! This defeats the point of the entire website and nothing (not even the login) will work! If you want to use this site, please turn on JavaScript.</p>
+              </div>
+          </noscript>
+          <div id="infoBox" class="messageBox"><p id="infoMsg"></p></div>
+          <div id="notLoggedIn">
+            <div class="switcher">
+              <a id="loginSwitcher" class="activeSwitcher">Login</a>
+              <a id="signupSwitcher">Sign Up</a>
+            </div>
+            <form id="loginForm" onsubmit="pageJS.login()" action="javascript:void(0);">
+              <p>Username:</p>
+              <input type="text" id="usernameField" autocomplete="username"/>
+              <p>Password:</p>
+              <input type="password" id="passwordField" autocomplete="password"/> <!-- MAKE SURE TO SUPPORT AUTOCOMPLETE FOR NEW PASSWORD -->
+              <p class="signuponly">Repeat Password:</p>
+              <input type="password" id="passwordRepeatField" class="signuponly" autocomplete="off"/>
+              <p class="signuponly">Authorisation Code:</p>
+              <input type="text" id="codeField" class="signuponly" autocomplete="off"/>
+              <button id="loginButton">Log in</button>
+            </form>
+          </div>
+          <div id="loggedIn">
+            <div id="loginInfo">
+              <div class="switcher">
+                <a id="serversSwitcher" class="activeSwitcher">Servers</a>
+                <a id="logoutSwitcher" href="/">Logout</a>
+                <a id="changePasswordSwitcher">Change Password</a>
+              </div>
+            </div>
+            <div id="serverlist">
+              <p>This section is work in progress.</p>
+            </div>
+            <form id="changePasswordForm">
+                <p class="adminOnly" id="changePasswordUsernameText">Username</p>
+                <input id="changePasswordUsername" class="adminOnly" type="text" autocomplete="username"/>
+                <p>Current Password:</p>
+                <input id="changePasswordOld" type="password" autocomplete="password"/>
+                <p>New Password:</p>
+                <input id="changePasswordNew" type="password" autocomplete="password"/>
+                <p>Repeat New Password:</p>
+                <input id="changePasswordNewRepeat" type="password" autocomplete="password"/>
+                <button id="changePasswordButton">Change Password</button>
+            </form>
           </div>
         </div>
-        <div id="serverlist">
-          <p>This section is work in progress.</p>
-        </div>
-        <form id="changePasswordForm">
-            <p class="adminOnly" id="changePasswordUsernameText">Username</p>
-            <input id="changePasswordUsername" class="adminOnly" type="text" autocomplete="username"/>
-            <p>Current Password:</p>
-            <input id="changePasswordOld" type="password" autocomplete="password"/>
-            <p>New Password:</p>
-            <input id="changePasswordNew" type="password" autocomplete="password"/>
-            <p>Repeat New Password:</p>
-            <input id="changePasswordNewRepeat" type="password" autocomplete="password"/>
-            <button id="changePasswordButton">Change Password</button>
-        </form>
       </div>
-    </div>
-    <div id="footer">
-      <p>By logging into this site, you agree to the use of cookies to keep you logged in.</p>
+      <div id="footer">
+        <p>By logging into this site, you agree to the use of cookies to keep you logged in.</p>
+      </div>
     </div>
   </body>
 </html>

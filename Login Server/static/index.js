@@ -88,6 +88,10 @@ class PageJS { //A class is used to avoid putting variables in the global scope.
       }
     };
 
+    this.logoutSwitcher.onclick = () => { //Log the user out.
+      this.logoutUser();
+    }
+
     this.pageReady = true; //Page is ready
   }
 
@@ -222,21 +226,38 @@ class PageJS { //A class is used to avoid putting variables in the global scope.
     }
   }
 
-  loginAs(token){ //Login as a user from the token given.
-    document.cookie = "token=" + token + ";"; //Set the document cookie.
+  loginAs(token, updateCookie=true){ //Login as a user from the token given.
+    if (updateCookie){ //Update the cookie if told to do so.
+      document.cookie = "token=" + token + ";"; //Set the document cookie.
+    }
 
     var tokenData = splitJWT(token); //Split the JSON web token into parts.
 
     this.notLoggedIn.style.display = "none";
-    this.loggedIn.style.display = "block";
+    this.loggedIn.style.display = "block"; //Show account panel.
+    this.subtext.innerText = "Welcome " + tokenData.payload.username + "!";
+  }
 
+  logoutUser(){ //Log a user out.
+    document.cookie = "token=;Expires=Thu, 01 Jan 1970 00:00:00 GMT"; //Delete the cookie and set it's expiry time to 0;
+
+    this.notLoggedIn.style.display = "block"; //Show login form.
+    this.loggedIn.style.display = "none";
+    this.subtext.innerText = "Please login or create an account to continue.";
   }
 }
 
+window.onload = ()=>{
 
-
-window.onload = () => {
   pageJS = new PageJS();
   pageJS.loadElements();
   pageJS.pageLoad();
+  let token = getCookies().token;
+
+  if (typeof token !== "undefined"){
+    pageJS.loginAs(token.value,false); //Log in the user without resetting the cookie.
+  } else {
+    pageJS.logoutUser();
+  }
+
 };

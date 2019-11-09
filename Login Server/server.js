@@ -17,7 +17,7 @@ const crypto = require('crypto'); //For generating salts and hashes.
 const buffer = require('buffer'); //For procesing data (e.g: converting string into hex). This is pretty much a more advanced string class and a string can be converted to a buffer and vice-versa.
 const zlib = require('zlib'); //For compression.
 const stream = require('stream'); //For data streaming.
-const {validateUsername, validatePassword, validateCode, base64Encode, base64Decode} = require('./static/sharedscripts.js'); //Shared scripts.
+const {validateUsername, validatePassword, validateCode, base64Encode, base64Decode, splitJWT} = require('./static/sharedscripts.js'); //Shared scripts.
 
 
 const contentTypes = { //Content types list.
@@ -58,6 +58,12 @@ const privateKey = crypto.createPrivateKey({
   format: "pem",
   key: prvKeyFile,
   passphrase: prvKeyPassword
+});
+
+//Create the public key object. No password needed.
+const publicKey = crypto.createPublicKey({
+  format: "pem",
+  key: pubKeyFile
 });
 
 //IP BLACKLISTER FOR API ABUSE.
@@ -291,13 +297,47 @@ function generateJWT(uuid,username,isAdmin){ //Generate a json web token for use
   var mainCombo = base64Encode(JSON.stringify(header)) + "." + base64Encode(JSON.stringify(payload)); //Convert header and payload to base64.
   var signer = crypto.createSign("RSA-SHA256"); //Create signer using RSA-SHA256.
   signer.update(mainCombo); //Update signer with the data.
-  var signature = base64Encode(signer.sign(privateKey));//Sign the data.
+  var signature = signer.sign(privateKey);//Sign the data.
+  var signatureB64 = base64Encode(signature); //Base64 encode the signature.
 
-  return mainCombo + "." + signature; //Combain the main part and the signature.
+  return mainCombo + "." + signatureB64; //Combain the main part and the signature.
 }
 
 function verifyJWT(token){ //Verify the json web token.
-  
+  let jwt = splitJWT(token);
+
+  if (jwt === false){ //Invalid token.
+    return false;
+  } else {
+
+    let verify = crypto.createVerify("RSA-SHA256");//Create verify.
+
+    verify.update(jwt.mainTokenData); //Insert main token data.
+    let signature;
+
+    try {
+      signature = base64Decode(jwt.signature,true);
+    } catch (e){
+      return false;
+    }
+
+    return verify.verify(publicKey, signature); //Verify the signature and return the result.
+  }
+}
+
+function signTest(){ //TESTING PURPOSES ONLY
+  let testString = "Hello world"; //Test string
+  let sign = crypto.createSign("RSA-SHA256"); //Signer
+  let verify = crypto.createVerify("RSA-SHA256"); //Verifier
+
+  sign.update(testString); //Input test string.
+  let signature = sign.sign(privateKey); //Sign test string.
+
+  verify.update(testString); //Input test string.
+  let verified = verify.verify(publicKey,signature);
+
+  console.log("Verified: " + verified);
+
 }
 
 function apiCall(method, req, res, dbconn){ //When an api call is made to the /api/ path.
@@ -397,6 +437,8 @@ function userLogin(params,res,dbconn){
 
           if (result.PasswordHash === hashPassword(params.password,result.PasswordSalt)){ //Regenerate the password hash from the salt and input and verify it.
             let jwt = generateJWT(result.UUID, result.Username, result.IsAdmin==1); //Generate a validation token.
+
+            console.log("JWT Verified:" + verifyJWT(jwt)); //TESTING
 
             apiLoginUser(res,jwt); //Log the user in.
 
