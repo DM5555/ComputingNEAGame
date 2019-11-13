@@ -35,6 +35,7 @@ const contentTypes = { //Content types list.
 };
 
 var dbconnection; //Make the database connection variable global so that all methods can access it.
+var olddbconnection; //For temporarily holding database connections before closing them.
 
 
 //Preload icon, index page and game page.
@@ -679,14 +680,31 @@ const httpserver = http.createServer((req,res)=>{ //Port 80 redirect from HTTP t
         res.end(); //Close connection.
 });
 
-dbconnection = mysql.createConnection({ //Create a sql database connection;
-  host: "localhost", //Login to localhost server.
-  user: "login_server", //Username is login_server.
-  password: fs.readFileSync("./.secret/db_password"), //Password is read from the db_password file in the secret folder.
-  database: "domsgame" //Select 'domsgame' database.
-});
+function connectDatabase(callback){
+  if (typeof dbconnection !== "undefined"){ //Check if there is an already open connection.
+    console.log("Refreshing database connection!");
+    olddbconnection = dbconnection;
 
-dbconnection.connect((err) => { //Attempt the connection to the server
+    setTimeout(()=>{
+      olddbconnection.end()
+    }, 20000); //Close old connection after 20 seconds.
+  }
+
+  dbconnection = mysql.createConnection({ //Create a sql database connection;
+    host: "localhost", //Login to localhost server.
+    user: "login_server", //Username is login_server.
+    password: fs.readFileSync("./.secret/db_password"), //Password is read from the db_password file in the secret folder.
+    database: "domsgame" //Select 'domsgame' database.
+  });
+
+  dbconnection.connect((err) => { //Attempt the connection to the server
+    if (typeof callback === "function"){
+      callback(err);
+    }
+  });
+}
+
+connectDatabase((err)=>{
   if(err){ //Error thrown if connection is failed.
     throw err;
   }
@@ -700,3 +718,7 @@ dbconnection.connect((err) => { //Attempt the connection to the server
 setInterval(function () { //Clears recent ips every minute.
   apiAccessList = {};
 }, 60000);
+
+setInterval(()=>{ //Reset database connection every 4 hours
+  connectDatabase();
+}, 30000);
