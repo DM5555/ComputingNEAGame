@@ -94,7 +94,7 @@ function checkPathChars(uri){ //Regular expressions are a disgrace to society. T
 }
 
 function checkPathSafe(uri){ //Make sure passed path is safe, and return a useable path if so.
-  if (uri === undefined || uri === null || uri == ""){ //No input or empty string
+  if (typeof uri === "undefined" || uri === null || uri == ""){ //No input or empty string
     return {
       status: "nopath"
     };
@@ -102,7 +102,7 @@ function checkPathSafe(uri){ //Make sure passed path is safe, and return a useab
 
   var pathname = url.parse(uri).pathname;
 
-  if (pathname === undefined || pathname === null || pathname === ""){ //Safe
+  if (typeof pathname === "undefined" || pathname === null || pathname === ""){ //Safe
     return {
       status: "safe",
       uri: "/"
@@ -135,7 +135,7 @@ function generateHeaders(type, cacheTime, compressed){ //Generate headers based 
 
   if (type !== ""){ //No type
     var typeName = contentTypes[type];
-    headers["Content-Type"] = typeName===undefined?"text/plain":typeName; //Default to plaintext
+    headers["Content-Type"] = (typeof typeName==="undefined")?"text/plain":typeName; //Default to plaintext
   }
 
   if(compressed){ //If there is compression enabled.
@@ -175,7 +175,7 @@ function getFilesLastModified(dir){ //Recursively finds files in a directory and
 
 
 function shouldFileBeSent(headers, filepath){ //Cheks if he file has been last modified since the time specified. Returns true if the file needs resending.
-  if (headers["if-modified-since"] !== undefined){ //Check if there is an if-modifed-since header.
+  if (typeof headers["if-modified-since"] !== "undefined"){ //Check if there is an if-modifed-since header.
     var lastModifiedDate;
     var lastModifed = headers["if-modified-since"]; //Set the value of the if-modified-since header to this.
     try { //Try catch for date.
@@ -186,7 +186,7 @@ function shouldFileBeSent(headers, filepath){ //Cheks if he file has been last m
     }
 
     //The date is valid.
-    if (staticModifyDates[filepath] !== undefined){
+    if (typeof staticModifyDates[filepath] !== "undefined"){
       var fileDate = staticModifyDates[filepath]; //Get the modification date of the file.
 
       if (fileDate.getTime() >= lastModifiedDate.getTime()){ //Compare dates.
@@ -203,7 +203,7 @@ function shouldFileBeSent(headers, filepath){ //Cheks if he file has been last m
 }
 
 function supportsCompression(headers){ //Check if the browser supports gzip compression.
-  if (headers["accept-encoding"] !== undefined){
+  if (typeof headers["accept-encoding"] !== "undefined"){
     return headers["accept-encoding"].includes("gzip"); //Chcek if the accept encoding string contains gzip.
   } else {
     return false;
@@ -306,23 +306,22 @@ function generateJWT(uuid,username,isAdmin){ //Generate a json web token for use
 
 function verifyJWT(token){ //Verify the json web token.
   let jwt = splitJWT(token);
-
   if (jwt === false){ //Invalid token.
     return false;
   } else {
-
     let verify = crypto.createVerify("RSA-SHA256");//Create verify.
-
     verify.update(jwt.mainTokenData); //Insert main token data.
     let signature;
-
     try {
       signature = base64Decode(jwt.signature,true);
     } catch (e){
       return false;
     }
-
-    return verify.verify(publicKey, signature); //Verify the signature and return the result.
+    if (verify.verify(publicKey, signature) && typeof jwt.payload.expiresMs === "number" && jwt.payload.expiresMs>Date.now()){ //Verify the signature, date and return the result.
+      return true;
+    } else {
+      return false; //The signature is invalid.
+    }
   }
 }
 
@@ -330,20 +329,25 @@ function signTest(){ //TESTING PURPOSES ONLY
   let testString = "Hello world"; //Test string
   let sign = crypto.createSign("RSA-SHA256"); //Signer
   let verify = crypto.createVerify("RSA-SHA256"); //Verifier
-
   sign.update(testString); //Input test string.
   let signature = sign.sign(privateKey); //Sign test string.
-
   verify.update(testString); //Input test string.
   let verified = verify.verify(publicKey,signature);
-
   console.log("Verified: " + verified);
+}
 
+function getJWTFromHeader(req){ //Will return an empty string if there is no JWT. Does not check or verify it.
+  if (typeof req.headers.authorization !== "string"){ //Non string header.
+    return "";
+  } else if(req.headers.authorization.length < 6){ //Header too short.
+    return "";
+  } else { //Token found.
+    return req.headers.authorization.slice(6);
+  }
 }
 
 function apiCall(method, req, res, dbconn){ //When an api call is made to the /api/ path.
   var ipAddress = req.connection.remoteAddress;
-
   if (typeof apiAccessList[ipAddress] === "undefined"){ //IP is not recorded.
     apiAccessList[ipAddress] = 0; //Log IP temporarily.
   }
@@ -355,6 +359,9 @@ function apiCall(method, req, res, dbconn){ //When an api call is made to the /a
           createAccount(params, res, dbconn);
         } else if (method == "login"){ //Logging in.
           userLogin(params, res, dbconn);
+        } else if (method == "change-password"){ //Changing a password.
+          let jwt = getJWTFromHeader(req);
+          changePassword(params, res, jwt, dbconn);
         } else {
           apiErrorDoesntExist(res); //Methods is nonexistent.
         }
@@ -379,9 +386,9 @@ function apiCall(method, req, res, dbconn){ //When an api call is made to the /a
 }
 
 async function createAccount(params, res, dbconn){ //Creates an ccount in the database.
-  if (params === undefined){ //Make sure the params are defined.
+  if (typeof params === "undefined"){ //Make sure the params are defined.
     apiErrorInvalidDetails(res); //No details passed.
-  } else if (params.username === undefined || params.password === undefined || params.code === undefined){ //Validity Check #1
+  } else if (typeof params.username === "undefined" || typeof params.password === "undefined" || typeof params.code === "undefined"){ //Validity Check #1
     apiErrorInvalidDetails(res); //Invalid details.
   } else if (!validateUsername(params.username) || !validatePassword(params.password) || !validateCode(params.code)){ //Something is wrong with the data entered.
     apiErrorInvalidDetails(res); //The username, password or code provided was invalid.
@@ -407,7 +414,7 @@ async function createAccount(params, res, dbconn){ //Creates an ccount in the da
         useCodeDB(params.code,dbconn).then(() => { //Remove code from database.
           let jwt = generateJWT(uuid,params.username,false);
 
-          apiLoginUser(res, jwt);
+          apiLoginUser(res, jwt); //Log the user in.
 
         }).catch((e) => {
           if (e) throw e;
@@ -418,40 +425,104 @@ async function createAccount(params, res, dbconn){ //Creates an ccount in the da
 }
 
 function userLogin(params,res,dbconn){
-  if (params === undefined){ //No params.
+  if (typeof params === "undefined"){ //No params.
     apiErrorInvalidDetails(res);
-  } else if (params.username === undefined || params.password === undefined){ //Username or password is undefined.
+  } else if (typeof params.username === "undefined" || typeof params.password === "undefined"){ //Username or password is undefined.
     apiErrorInvalidDetails(res);
   } else if (!validateUsername(params.username) || !validatePassword(params.password)){ //Invalid username or password.
     apiErrorInvalidDetails(res);
   } else {
-    const query = "SELECT * FROM Users WHERE Username=?"; //Select username data.
-    const insert = [params.username]; //Query inserts.
-    const sql = mysql.format(query,insert); //Formatted sql.
-
-    dbconn.query(sql, (err,results,fields) => { //Make query to database.
-      if (err) {
-        apiErrorInternal(res);
-      } else { //Results retrieved.
-        if (results.length > 0){ //An account exists.
-          let result = results[0]; //Select first (and only) result.
-
-          if (result.PasswordHash === hashPassword(params.password,result.PasswordSalt)){ //Regenerate the password hash from the salt and input and verify it.
-            let jwt = generateJWT(result.UUID, result.Username, result.IsAdmin==1); //Generate a validation token.
-
-            console.log("JWT Verified:" + verifyJWT(jwt)); //TESTING
-
-            apiLoginUser(res,jwt); //Log the user in.
-
-          } else {
-            apiErrorInvalidPassword(res); //The password was wrong.
-          }
-
-        } else { //No Results.
-          apiErrorInvalidPassword(res); //Send an invalid login error so that the user/bot does not know if the user exists.
+    verifyPassword(params.username,params.password,dbconn).then((userInfo)=>{
+      let jwt = generateJWT(userInfo.UUID, userInfo.username, userInfo.isAdmin==1); //Generate a validation token.
+      apiLoginUser(res,jwt); //Log the user in.
+    }).catch((err)=>{
+      if (typeof err === "string"){ //Check if the error is throwable or a failed verification.
+        if (err === "INVALID_PASSWORD" || err === "INVALID_USERNAME"){ //Check to see if the error was because of a bad username-password combination.
+          apiErrorInvalidPassword(res);
+        } else {
+          apiErrorInternal(res);
+          console.error("Unknown Login Error: " + err);
         }
+      } else {
+        throw err; //Throw genuine errors.
       }
     });
+  }
+}
+
+function verifyPassword(username,password,dbconn){ //Check the password in the database against the one given.
+  return new Promise((resolve,reject)=>{
+    const query = "SELECT * FROM Users WHERE Username=?"; //Begin a query.
+    const insert = [username];
+    const sql = mysql.format(query,insert);
+
+    dbconn.query(sql, (err,results,fields)=>{
+      if (err){ //An error occurred.
+        reject(err);
+      }
+
+      if (results.length > 0){ //Check if there was actually a user found.
+        let result = results[0]; //Select first result.
+
+        if (result.PasswordHash === hashPassword(password,result.PasswordSalt)){ //Check to see if the password is valid.
+          resolve({ //Return user info.
+            UUID: result.UUID,
+            username: result.Username,
+            isAdmin: result.IsAdmin==1
+          });
+        } else {
+          reject("INVALID_PASSWORD");
+        }
+      } else {
+        reject("INVALID_USERNAME"); //Could not find the user.
+      }
+    });
+  });
+}
+
+function changePassword(params,res,token,dbconn){ //Change a user's password.
+  if (!verifyJWT(token)){ //Check the JWT
+    apiErrorAuthorisationFailed(res);
+  } else if(typeof params === "undefined"){ //Parameters undefined
+    apiErrorInvalidDetails(res);
+  } else if (typeof params.oldPassword === "undefined" || typeof params.newPassword === "undefined"){ //Make sure the username and password are defined.
+    apiErrorInvalidDetails(res);
+  } else if (!validatePassword(params.oldPassword) || !validatePassword(params.newPassword)){ //Make sure the passwords are valid.
+    apiErrorInvalidDetails(res);
+  } else { //Inputs appear to be valid. Proceed to checking the old password and token to ensure it's correct.
+    let tokenInfo = splitJWT(token);
+
+    if (tokenInfo !== false){ //Make sure token isn't invalid.
+      verifyPassword(tokenInfo.payload.username,params.oldPassword,dbconn).then((userInfo)=>{ //User information is valid.
+        let newPasswordSalt = randomSalt(); //Generate a salt for the password.
+        let newPasswordHash = hashPassword(params.newPassword, newPasswordSalt); //Generate a hash for the salt.
+
+        let query = "UPDATE Users SET PasswordHash=?,PasswordSalt=? WHERE Username=?"; //Create an sql statement.
+        let insert = [newPasswordHash,newPasswordSalt,tokenInfo.payload.username]; //Create an insert array.
+        let sql = mysql.format(query,insert); //Prepare the statement
+
+        dbconn.query(sql, (err,results,fields)=>{
+          if (err){ //Catch any odd errors.
+            throw err;
+          }
+          //No error found.
+          apiPasswordChange(res); //Return info the user.
+        });
+      }).catch((err)=>{ //Catch an issue such as an incorrect combination.
+        if (typeof err === "string"){
+          if (err === "INVALID_USERNAME" || err === "INVALID_PASSWORD"){
+            apiErrorInvalidPassword(res);
+          } else {
+            apiErrorInternal(res);
+            console.error("Unknown Login Error: " + err);
+          }
+        } else {
+          throw err;
+        }
+      });
+    } else {
+      apiErrorAuthorisationFailed(res);
+    }
   }
 }
 
@@ -519,12 +590,12 @@ function apiErrorInternal(res){ //Internal Server error in JSON format. This use
   }));
 }
 
-function apiErrorInvalidDetails(res){ //Invalid detauks! Error Code: 600
+function apiErrorInvalidDetails(res){ //Invalid details! Error Code: 600
   res.writeHead(400);
   res.end(JSON.stringify({
     error: true,
     errorCode: 600,
-    errorMsg: "Your details did not satisfy the requirement for making an account or logging in."
+    errorMsg: "Your details did not satisfy the requirement for this action."
   }));
 }
 
@@ -564,13 +635,31 @@ function apiErrorTooManyRequests(res){ //Too many requests! Error Code: 429
   }));
 }
 
+function apiErrorAuthorisationFailed(res){ //The user's token was invalid or did not exist.
+  res.writeHead(401);
+  res.end(JSON.stringify({
+    error: true,
+    errorCode: 401,
+    errorMsg: "Authorisation Failed! Please log out and log in again."
+  }));
+}
+
 function apiLoginUser(res,token){ //Return the login data to the user.
   res.writeHead(200); //Valid response.
   res.end(JSON.stringify({ //Return the data. To the user.
     error: false,
     data: {
       token: token
-    }
+    },
+    method:"LOGIN"
+  }));
+}
+
+function apiPasswordChange(res){ //Password has been changed.
+  res.writeHead(200);
+  res.end(JSON.stringify({
+    error:false,
+    method: "CHANGE_PASSWORD"
   }));
 }
 
@@ -686,7 +775,7 @@ function connectDatabase(callback){
     olddbconnection = dbconnection;
 
     setTimeout(()=>{
-      olddbconnection.end()
+      olddbconnection.end();
     }, 20000); //Close old connection after 20 seconds.
   }
 
@@ -721,4 +810,4 @@ setInterval(function () { //Clears recent ips every minute.
 
 setInterval(()=>{ //Reset database connection every 4 hours
   connectDatabase();
-}, 30000);
+}, 14400000);

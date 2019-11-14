@@ -101,11 +101,21 @@ function splitJWT(token){ //Split a JSON web token. Into the header and the sign
 
       let mainTokenData = token.slice(0,headerEnd+payloadEnd+1); //Gets main token (header and payload) +1 for the dot in the middle.
 
-      return { //Return data and signature.
-        payload:payload,
-        signature:signature,
-        mainTokenData: mainTokenData
-      };
+      if ( //Type check the essential payload info for users.
+        typeof payload.uuid === "string" &&
+        typeof payload.username === "string" &&
+        typeof payload.expiresMs === "number"
+      ){
+        return { //Return data and signature.
+          payload:payload,
+          signature:signature,
+          mainTokenData: mainTokenData
+        };
+      } else { //Payload was invalid.
+        return false;
+      }
+
+
     }
   }
 }
@@ -185,5 +195,5 @@ if (typeof module !== "undefined"){ //Only for node.
     base64Decode: base64Decode,
     splitJWT: splitJWT,
     getCookies: getCookies
-  }
+  };
 }

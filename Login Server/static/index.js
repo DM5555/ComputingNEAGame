@@ -90,7 +90,28 @@ class PageJS { //A class is used to avoid putting variables in the global scope.
 
     this.logoutSwitcher.onclick = () => { //Log the user out.
       this.logoutUser();
-    }
+    };
+
+    this.serversSwitcher.onclick = () => { //Switch to server list.
+      this.switchToServerPanel();
+    };
+
+    this.changePasswordSwitcher.onclick = () => { //Switch to change password section.
+      if (this.modeB !== "changePassword"){
+        this.changePasswordForm.style.display = "inline"; //Show change password section.
+        this.serverlist.style.display = "none"; //Hide server list.
+        this.changePasswordSwitcher.classList.add("activeSwitcher"); //Set active switcher.
+        this.serversSwitcher.classList.remove("activeSwitcher");
+
+        //Enable autocomplete.
+        this.changePasswordOld.autocomplete = "password";
+        this.changePasswordNew.autocomplete = "new-password";
+        this.changePasswordNewRepeat.autocomplete = "new-password";
+
+        this.modeB = "changePassword";
+      }
+
+    };
 
     this.pageReady = true; //Page is ready
   }
@@ -101,7 +122,26 @@ class PageJS { //A class is used to avoid putting variables in the global scope.
     }
   }
 
+  switchToServerPanel(){ //Switches the active panel from the password changer to the server panel.
+    if (this.modeB !== "servers"){
+      this.serverlist.style.display = "inline-block"; //Show server list.
+      this.changePasswordForm.style.display = "none"; //Hide change password form.
+      this.serversSwitcher.classList.add("activeSwitcher"); //Set active switcher.
+      this.changePasswordSwitcher.classList.remove("activeSwitcher");
 
+      //Disable autocompletes.
+      this.changePasswordOld.autocomplete = "off";
+      this.changePasswordNew.autocomplete = "off";
+      this.changePasswordNewRepeat .autocomplete= "off";
+
+      //Clear fields.
+      this.changePasswordOld.value = "";
+      this.changePasswordNew.value = "";
+      this.changePasswordNewRepeat.value = "";
+
+      this.modeB = "servers"; //Set mode.
+    }
+  }
 
   login(){ //Login submitted
     if (this.pageReady && !this.pendingRequest){ //Only calls if the page is ready and there is not a request pending.
@@ -135,12 +175,14 @@ class PageJS { //A class is used to avoid putting variables in the global scope.
         } else if (!validatePassword(this.passwordField.value)) { //Validate password.
           this.showMessage("Your password must be between 8-32 characters in length and secure.","error"); //Bad password.
         } else if (!validateCode(this.codeField.value)) { //Validate code.
-          this.showMessage("Your code should be 12 characters in length and alphanumerical (including spaces).","error"); //Bad code.
+          this.showMessage("Your code must be 12 characters in length and alphanumerical (including spaces).","error"); //Bad code.
         } else { //Username and password valid.
           params = "username=" + encodeURIComponent(this.usernameField.value) + "&password=" + encodeURIComponent(this.passwordField.value) + "&code=" + encodeURIComponent(this.codeField.value); //Params to input
 
           this.makeRequest("/api/create-account", "POST", params).then((responseData) => { //Make a request to the server to create an account.
             this.showMessage("Account creation successful!", "success");
+
+            this.loginAs(responseData.data.token); //Log the user in with the returned token
           }).catch((e) => {
             if (typeof e !== "undefined"){ //Actual error.
               throw e;
@@ -155,7 +197,36 @@ class PageJS { //A class is used to avoid putting variables in the global scope.
     return true;
   }
 
-  makeRequest(url, type, params){ //Make an xhr request. ALSO SHOWS ERRORS.
+  changePassword(){ //Called when the change password button is clicked.
+    if (this.pageReady && !this.pendingRequest){ //Ensure the page is ready and that there is not a pending request.
+      if (!validatePassword(this.changePasswordOld.value)){ //Check to ensure that the passwords match.
+        this.showMessage("The old password you have entered is not a valid password (8-32 characters range).","error"); //Bad old password.
+      } else if (!validatePassword(this.changePasswordNew.value)){
+        this.showMessage("The new password you have entered must be between 9-32 characters in length and secure.","error"); //Bad new password
+      } else if(this.changePasswordNew.value !== this.changePasswordNewRepeat.value){ //Validate old password.
+          this.showMessage("The new passwords you have entered do not match.","error");
+      } else if(this.changePasswordNew.value === this.changePasswordOld.value){ //Validate new password.
+          this.showMessage("Your old password cannot be your new password!", "error");
+      } else { //Inputs appear to be valid.
+        var params = "oldPassword=" + encodeURIComponent(this.changePasswordOld.value) + "&newPassword=" + encodeURIComponent(this.changePasswordNew.value); //Encode the parameters to be sent to the server.
+
+        this.makeRequest("/api/change-password","POST",params,true).then((responseData)=>{ //Send the request to the server.
+          this.showMessage("Password change successful!", "success"); //Inform the user that their password change was successful.
+
+          this.switchToServerPanel();
+        }).catch((e)=> {
+          if (typeof e !== "undefined"){ //Actual error occurred.
+            throw e;
+          }
+        });
+        this.showMessage("Changing password...","info");
+      }
+    } // Do nothing if the page is not ready yet.
+
+    return true;
+  }
+
+  makeRequest(url, type, params, useAuthorisation=false){ //Make an xhr request. ALSO SHOWS ERRORS.
     return new Promise((resolve, reject)=>{
       var request = new XMLHttpRequest(); //Create a request
       request.timeout = 15000; //15 sec timeout.
@@ -194,12 +265,18 @@ class PageJS { //A class is used to avoid putting variables in the global scope.
         }
       };
 
+      if (useAuthorisation) {
+        request.setRequestHeader("Authorization", "Basic " + this.token);
+      }
+
       if (params !== ""){
         request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded"); //Send content types.
         request.send(params); //Send request with parameters.
       } else {
         request.send(); //Send request.
       }
+
+
 
       this.pendingRequest = true;
 
@@ -227,15 +304,21 @@ class PageJS { //A class is used to avoid putting variables in the global scope.
   }
 
   loginAs(token, updateCookie=true){ //Login as a user from the token given.
-    if (updateCookie){ //Update the cookie if told to do so.
-      document.cookie = "token=" + token + ";"; //Set the document cookie.
-    }
-
     var tokenData = splitJWT(token); //Split the JSON web token into parts.
 
-    this.notLoggedIn.style.display = "none";
-    this.loggedIn.style.display = "block"; //Show account panel.
-    this.subtext.innerText = "Welcome " + tokenData.payload.username + "!";
+    if (tokenData.payload.expiresMs > Date.now()){ //Date check.
+      if (updateCookie){ //Update the cookie if told to do so.
+        document.cookie = "token=" + token + ";Expires="+(new Date(tokenData.payload.expiresMs)).toGMTString(); //Set the document cookie.
+      }
+
+      this.token = token;
+
+      this.notLoggedIn.style.display = "none";
+      this.loggedIn.style.display = "block"; //Show account panel.
+      this.subtext.innerText = "Welcome " + tokenData.payload.username + "!";
+    } else { //Token has expired.
+      logoutUser();
+    }
   }
 
   logoutUser(){ //Log a user out.
@@ -245,6 +328,8 @@ class PageJS { //A class is used to avoid putting variables in the global scope.
     this.loggedIn.style.display = "none";
     this.subtext.innerText = "Please login or create an account to continue.";
   }
+
+
 }
 
 window.onload = ()=>{
