@@ -346,7 +346,7 @@ function getJWTFromHeader(req){ //Will return an empty string if there is no JWT
   }
 }
 
-function apiCall(method, req, res, dbconn){ //When an api call is made to the /api/ path.
+function apiCall(method, req, res, dbconn){ //When an api call is made to the /api/ path
   var ipAddress = req.connection.remoteAddress;
   if (typeof apiAccessList[ipAddress] === "undefined"){ //IP is not recorded.
     apiAccessList[ipAddress] = 0; //Log IP temporarily.
@@ -356,24 +356,25 @@ function apiCall(method, req, res, dbconn){ //When an api call is made to the /a
     if (req.method == "POST"){ //Post methods
       getPostData(req).then((params) => {
         if (method == "create-account"){ //Account creation
-          createAccount(params, res, dbconn);
+          createAccount(params, res, ipAddress, dbconn);
         } else if (method == "login"){ //Logging in.
-          userLogin(params, res, dbconn);
+          console.log(ipAddress);
+          userLogin(params, res, ipAddress, dbconn);
         } else if (method == "change-password"){ //Changing a password.
           let jwt = getJWTFromHeader(req);
-          changePassword(params, res, jwt, dbconn);
+          changePassword(params, res, jwt, ipAddress, dbconn);
         } else {
-          apiErrorDoesntExist(res); //Methods is nonexistent.
+          apiError("DOES_NOT_EXIST",res); //Methods is nonexistent.
         }
       }).catch((e) => {
-        apiErrorInternal(res); //Something weird happened.
+        apiError("INTERNAL",res); //Something weird happened.
         throw e; //Throw the error.
       });
     } else {
-      apiErrorDoesntExist(res); //Method nonexistent.
+      apiError("DOES_NOT_EXIST",res); //Method nonexistent.
     }
   } else if (apiAccessList[ipAddress] < apiLimit*3){ //Return too many requets. If the user is under 3 times the limit.
-    apiErrorTooManyRequests(res);
+    apiError("TOO_MANY_REQUESTS",res);
   } else { //Drop connection without JSON after 10 seconds.
     setTimeout(function () {
       res.writeHead(429);
@@ -385,15 +386,16 @@ function apiCall(method, req, res, dbconn){ //When an api call is made to the /a
 
 }
 
-async function createAccount(params, res, dbconn){ //Creates an ccount in the database.
+async function createAccount(params, res, ipAddress, dbconn){ //Creates an ccount in the database.
   if (typeof params === "undefined"){ //Make sure the params are defined.
-    apiErrorInvalidDetails(res); //No details passed.
+    apiError("INVALID_DETAILS",res); //No details passed.
   } else if (typeof params.username === "undefined" || typeof params.password === "undefined" || typeof params.code === "undefined"){ //Validity Check #1
-    apiErrorInvalidDetails(res); //Invalid details.
+    apiError("INVALID_DETAILS",res); //Invalid details.
   } else if (!validateUsername(params.username) || !validatePassword(params.password) || !validateCode(params.code)){ //Something is wrong with the data entered.
-    apiErrorInvalidDetails(res); //The username, password or code provided was invalid.
+    apiError("INVALID_DETAILS",res); //The username, password or code provided was invalid.
   } else if (!await validateCodeDB(params.code,dbconn)){ //Check the code on the database.
-    apiErrorInvalidCode(res); //Code is invalid.
+    logActionInDatabase(dbconn, "CREATE_ACCOUNT_BAD_CODE", ipAddress); //Log the failed attempt at creating an account.
+    apiError("INVALID_AUTH_CODE",res); //Code is invalid.
   } else { //No error so create the user.
     var uuid = generateUUID(); //User id.
     var passwordSalt = randomSalt(); //Create password salt.
@@ -406,7 +408,8 @@ async function createAccount(params, res, dbconn){ //Creates an ccount in the da
     dbconn.query(sql,(err,results,fields) => { //Make call to database.
       if (err){ //Error catching
         if (err.code === "ER_DUP_ENTRY"){ //Username is taken.
-          apiErrorUsernameTaken(res);
+          apiError("USERNAME_TAKEN",res);
+          logActionInDatabase(dbconn, "CREATE_ACCOUNT_USERNAME_TAKEN", ipAddress); //Log the failed attempt at creating an account.
         } else {
           throw err;
         }
@@ -416,6 +419,9 @@ async function createAccount(params, res, dbconn){ //Creates an ccount in the da
 
           apiLoginUser(res, jwt); //Log the user in.
 
+
+          logActionInDatabase(dbconn, "CREATE_ACCOUNT", ipAddress, uuid); //Log the account creation.
+
         }).catch((e) => {
           if (e) throw e;
         });
@@ -424,23 +430,25 @@ async function createAccount(params, res, dbconn){ //Creates an ccount in the da
   }
 }
 
-function userLogin(params,res,dbconn){
+function userLogin(params, res, ipAddress, dbconn){
   if (typeof params === "undefined"){ //No params.
-    apiErrorInvalidDetails(res);
+    apiError("INVALID_DETAILS",res);
   } else if (typeof params.username === "undefined" || typeof params.password === "undefined"){ //Username or password is undefined.
-    apiErrorInvalidDetails(res);
+    apiError("INVALID_DETAILS",res);
   } else if (!validateUsername(params.username) || !validatePassword(params.password)){ //Invalid username or password.
-    apiErrorInvalidDetails(res);
+    apiError("INVALID_DETAILS",res);
   } else {
     verifyPassword(params.username,params.password,dbconn).then((userInfo)=>{
       let jwt = generateJWT(userInfo.UUID, userInfo.username, userInfo.isAdmin==1); //Generate a validation token.
       apiLoginUser(res,jwt); //Log the user in.
+      logActionInDatabase(dbconn, "LOGIN_SUCCESS", ipAddress, userInfo.UUID); //Log the action in the database along with the UUID.
     }).catch((err)=>{
       if (typeof err === "string"){ //Check if the error is throwable or a failed verification.
         if (err === "INVALID_PASSWORD" || err === "INVALID_USERNAME"){ //Check to see if the error was because of a bad username-password combination.
-          apiErrorInvalidPassword(res);
+          apiError("BAD_PASSWORD",res);
+          logActionInDatabase(dbconn, "LOGIN_INCORRECT", ipAddress); //Log the action in the database with no uuid
         } else {
-          apiErrorInternal(res);
+          apiError("INTERNAL",res);
           console.error("Unknown Login Error: " + err);
         }
       } else {
@@ -480,15 +488,15 @@ function verifyPassword(username,password,dbconn){ //Check the password in the d
   });
 }
 
-function changePassword(params,res,token,dbconn){ //Change a user's password.
+function changePassword(params,res,token,ipAddress,dbconn){ //Change a user's password.
   if (!verifyJWT(token)){ //Check the JWT
-    apiErrorAuthorisationFailed(res);
+    apiError("AUTHORISATION_FAILED",res);
   } else if(typeof params === "undefined"){ //Parameters undefined
-    apiErrorInvalidDetails(res);
+    apiError("INVALID_DETAILS",res);
   } else if (typeof params.oldPassword === "undefined" || typeof params.newPassword === "undefined"){ //Make sure the username and password are defined.
-    apiErrorInvalidDetails(res);
+    apiError("INVALID_DETAILS",res);
   } else if (!validatePassword(params.oldPassword) || !validatePassword(params.newPassword)){ //Make sure the passwords are valid.
-    apiErrorInvalidDetails(res);
+    apiError("INVALID_DETAILS",res);
   } else { //Inputs appear to be valid. Proceed to checking the old password and token to ensure it's correct.
     let tokenInfo = splitJWT(token);
 
@@ -507,13 +515,16 @@ function changePassword(params,res,token,dbconn){ //Change a user's password.
           }
           //No error found.
           apiPasswordChange(res); //Return info the user.
+
+          logActionInDatabase(dbconn, "CHANGE_PASSWORD", ipAddress, tokenInfo.payload.uuid); //Log the action in the database with the UUID
         });
       }).catch((err)=>{ //Catch an issue such as an incorrect combination.
         if (typeof err === "string"){
           if (err === "INVALID_USERNAME" || err === "INVALID_PASSWORD"){
-            apiErrorInvalidPassword(res);
+            apiError("BAD_PASSWORD",res);
+            logActionInDatabase(dbconn, "CHANGE_PASSWORD_FAIL", ipAddress); //Log the action in the database
           } else {
-            apiErrorInternal(res);
+            apiError("INTERNAL",res);
             console.error("Unknown Login Error: " + err);
           }
         } else {
@@ -521,7 +532,7 @@ function changePassword(params,res,token,dbconn){ //Change a user's password.
         }
       });
     } else {
-      apiErrorAuthorisationFailed(res);
+      apiError("AUTHORISATION_FAILED",res);
     }
   }
 }
@@ -544,6 +555,55 @@ function validateCodeDB(code,dbconn){ //Validate codes with the database.
       }
     });
   });
+}
+
+function logActionInDatabase(dbconn, action, ipAddress, uuid=""){ //Logs an API action in the database.
+  let query;
+  let inserts;
+
+  let actionName;
+  switch(action){ //Conver the action into the database name and if it was successful. Only calls on the database will end up logged.
+    case "CREATE_ACCOUNT": //Account created.
+      actionName="user.create.success";
+      break;
+    case "CREATE_ACCOUNT_BAD_CODE": //Invalid auth code for account creation.
+      actionName="user.create.badCode";
+      break;
+    case "CREATE_ACCOUNT_USERNAME_TAKEN": //Invalid auth code for account creation.
+      actionName="user.create.usernameTaken";
+      break;
+    case "LOGIN_SUCCESS": //Successful login.
+      actionName="user.login.success";
+      break;
+    case "LOGIN_INCORRECT": //Incorrect username or pasword.
+      actionName="user.login.fail";
+      break;
+    case "CHANGE_PASSWORD": //Password changed.
+      actionName="user.changePassword.success";
+      break;
+    case "CHANGE_PASSWORD_FAIL": //User entered a bad old password so it failed.
+      actionName="user.changePassword.fail";
+      break;
+  }
+
+  if (uuid === ""){ //NO UUID PRESENT.
+    query = "INSERT INTO APILog (IPAddress,Action,Timestamp) VALUES (INET6_ATON(?),?,?)"; //Create a query to be sent to the server.
+    inserts = [ipAddress, actionName, new Date()]; //Inserts to prepare.
+  } else { //UUID PRESENT.
+    query = "INSERT INTO APILog (UUID,IPAddress,Action,Timestamp) VALUES (?,INET6_ATON(?),?,?)";
+    inserts = [uuid, ipAddress, actionName, new Date()];
+  }
+
+  let sql = mysql.format(query,inserts); //Prepare the statement.
+
+
+  dbconn.query(sql, (err,results,fields)=>{ //Make call to database.
+    if (err){ //Catch errors;
+      throw err;
+    }
+  });
+
+
 }
 
 function useCodeDB(code,dbconn){ //Invalidate code.
@@ -572,75 +632,66 @@ function generateUUID(){ //Generate a version 4 uuid.
   return hexString.slice(0,8) + "-" + hexString.slice(8,12) + "-4" + hexString.slice(13,16) + "-" + hexString.slice(16,20) + "-" + hexString.slice(20,32); //Put the hex into a uuid.
 }
 
-function apiErrorDoesntExist(res){ //Error 404 in JSON format.
-  res.writeHead(404);
-  res.end(JSON.stringify({
-    error: true,
-    errorCode :404,
-    errorMsg: "This api call does not exist or you are using the wrong method!"
-  }));
-}
 
-function apiErrorInternal(res){ //Internal Server error in JSON format. This uses error 500.
-  res.writeHead(500);
-  res.end(JSON.stringify({
-    error: true,
-    errorCode: 500,
-    errorMsg: "An internal server error occurred."
-  }));
-}
 
-function apiErrorInvalidDetails(res){ //Invalid details! Error Code: 600
-  res.writeHead(400);
-  res.end(JSON.stringify({
-    error: true,
-    errorCode: 600,
-    errorMsg: "Your details did not satisfy the requirement for this action."
-  }));
-}
+function apiError(errName, res){ //Core function for API errors.
+  let errorCode; //The numeric code.
+  let errorMsg; //The error message.
+  let httpErrorCode; //The HTTP status code to send.
 
-function apiErrorInvalidCode(res){ //Invalid code! Error Code: 601
-  res.writeHead(400);
-  res.end(JSON.stringify({
-    error: true,
-    errorCode: 601,
-    errorMsg: "The code you entered is already used or never existed!"
-  }));
-}
+  switch(errName){ //Error cases.
+    case "DOES_NOT_EXIST": //Api method does not exist or the wrong method is being used.
+      errorCode=404;
+      httpErrorCode=404;
+      errorMsg="This api call does not exist or you are using the wrong method!";
+      break;
+    case "INTERNAL": //An internal server error occurred.
+      errorCode=500;
+      httpErrorCode=500;
+      errorMsg="An internal server error occurred.";
+      break;
+    case "INVALID_DETAILS": //The details entered do not meet the requirements (e.g: password is too short).
+      errorCode=600;
+      httpErrorCode=400;
+      errorMsg="Your details did not satisfy the requirement for this action.";
+      break;
+    case "INVALID_AUTH_CODE": //The authorisation code to create an account is invalid.
+      errorCode=601;
+      httpErrorCode=400;
+      errorMsg="The code you entered is already used or never existed!";
+      break;
+    case "BAD_PASSWORD": //The username and password combination is incorrect.
+      errorCode=602;
+      httpErrorCode=400;
+      errorMsg="The username or password you have entered is incorrect.";
+      break;
+    case "USERNAME_TAKEN": //The username for a new account is already taken.
+      errorCode=603;
+      httpErrorCode=400;
+      errorMsg="The username you entered is taken!";
+      break;
+    case "TOO_MANY_REQUESTS": //The user(or bot) is being rate limited for spamming the API with requests.
+      errorCode=429;
+      httpErrorCode=429;
+      errorMsg="Too many requests!";
+      break;
+    case "AUTHORISATION_FAILED": //The JWT token is invalid.
+      errorCode=401;
+      httpErrorCode=401;
+      errorMsg="Authorisation Failed! Please log out and log in again.";
+      break;
+    default:
+      errorCode=400;
+      httpErrorCode=400;
+      errorMsg="Something went wrong!";
+      break;
+  }
 
-function apiErrorInvalidPassword(res){ //Invalid login credidentials! Error Code: 602
-  res.writeHead(400);
-  res.end(JSON.stringify({
-    error: true,
-    errorCode: 602,
-    errorMsg: "The username or password you have entered is incorrect."
-  }));
-}
-
-function apiErrorUsernameTaken(res){ //Username taken! Error Code: 603
-  res.writeHead(400);
-  res.end(JSON.stringify({
-    error: true,
-    errorCode: 603,
-    errorMsg: "The username you entered is taken!"
-  }));
-}
-
-function apiErrorTooManyRequests(res){ //Too many requests! Error Code: 429
-  res.writeHead(429);
-  res.end(JSON.stringify({
-    error: true,
-    errorCode: 429,
-    errorMsg: "Too many requests!"
-  }));
-}
-
-function apiErrorAuthorisationFailed(res){ //The user's token was invalid or did not exist.
-  res.writeHead(401);
-  res.end(JSON.stringify({
-    error: true,
-    errorCode: 401,
-    errorMsg: "Authorisation Failed! Please log out and log in again."
+  res.writeHead(httpErrorCode); //Write the HTTP status code.
+  res.end(JSON.stringify({ //Send the error data in JSON format.
+    error:true,
+    errorCode: errorCode,
+    errorMsg: errorMsg
   }));
 }
 
