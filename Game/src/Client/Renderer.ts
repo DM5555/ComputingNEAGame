@@ -17,6 +17,8 @@ export class Renderer {
   private entityGraphicsLink:Map<Entity,PIXI.Graphics>;
   public readonly world:World;
 
+  private backgroundSprite:PIXI.Sprite; //Background image sprite.
+
   /** Create a new render object in the container element specified and the world given..*/
   constructor(container:HTMLElement,world:World){
     this.container = container; //Set the container field.
@@ -39,13 +41,14 @@ export class Renderer {
       backgroundColor: 16777215 //Solid white.
     });
 
-    this.updateWindowToScreen(); //Resize the pixi renderer.
+    this.loadBackgroundImage(); //Load the background image into the game.
 
     window.addEventListener("resize",()=>{ //On parent element resize
       this.updateWindowToScreen(); //Resize
     });
 
     container.appendChild(this.app.view); //Add renderer to body.
+
 
     //Create an event listener for the world when entities are added.
     this.world.eventRegistry.addEventListener("addEntity",(ent:Entity)=>{
@@ -58,12 +61,6 @@ export class Renderer {
       this.app.stage.addChild(graphics); //Add the object to the stage.
 
     });
-
-  }
-
-  /**Update the canvas size to the parent element.*/
-  public updateWindowToScreen():void{
-    this.app.renderer.resize(this.container.offsetWidth,this.container.offsetHeight); //Resize to the offsetwidth and offsetheight of parent.
   }
 
   /**Create a pixi graphics object from an entity.*/
@@ -112,6 +109,27 @@ export class Renderer {
     graphics.lineTo(25,50);
     graphics.closePath(); //Finish path.
     this.app.stage.addChild(graphics); //Add to graphics
+  }
+
+  /** Load the background image as a sprite. */
+  private loadBackgroundImage():void{ //Asynchronously adds the background image.
+    console.debug("Background Image URL: " + this.world.backgroundImage); //Debug
+    PIXI.loader.add("BackgroundImage",this.world.backgroundImage,()=>{}).load(()=>{ //Load the image and then run the callback
+      let backgroundTexture: PIXI.Texture = PIXI.utils.TextureCache["BackgroundImage"]; //Load background image from texture cache.
+      this.backgroundSprite = new PIXI.Sprite(backgroundTexture); //Create a sprite.
+      this.backgroundSprite.anchor.set(0.5,0.5); //Anchor the sprite's center to the center of the image.
+      this.app.stage.addChild(this.backgroundSprite); //Add the sprite to the stage.
+
+      this.updateWindowToScreen();
+    });
+  }
+
+  /**Update the canvas size to the parent element.*/
+  private updateWindowToScreen():void{
+    this.app.renderer.resize(this.container.offsetWidth,this.container.offsetHeight); //Resize to the offsetwidth and offsetheight of parent.
+
+    this.backgroundSprite.position.set(this.app.renderer.width/2,this.app.renderer.height/2); //Set position to half of height and half width to center the image in the screen.
+    this.backgroundSprite.scale.set(this.app.renderer.height/960,this.app.renderer.height/960); //Scale bound to height.
   }
 
 }

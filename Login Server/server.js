@@ -632,8 +632,6 @@ function generateUUID(){ //Generate a version 4 uuid.
   return hexString.slice(0,8) + "-" + hexString.slice(8,12) + "-4" + hexString.slice(13,16) + "-" + hexString.slice(16,20) + "-" + hexString.slice(20,32); //Put the hex into a uuid.
 }
 
-
-
 function apiError(errName, res){ //Core function for API errors.
   let errorCode; //The numeric code.
   let errorMsg; //The error message.
@@ -801,8 +799,6 @@ const server = https.createServer({
     } else { //Page not found
       error404(res);
     }
-
-
   } else if (urlstate.status == "nopath"){ //Invalid uri
     error404(res);
   } else if (urlstate.status == "unsafe"){ //Disallowed characters

@@ -29,6 +29,7 @@ export abstract class InvokingInstance {
     }).catch((err:any)=>{
       if (err instanceof Error){
         console.error("ACTUAL ERROR OCCURRED");
+        console.error("Error" +  err.stack);
         throw err;
       } else {
         console.error("Game state could not be created as the configuration file failed to load! Error Code: " + err);

@@ -12,7 +12,7 @@ export class GameState {
   /**Create a new game using the properties defined in the config.json file.*/
   constructor(cfg:object){
     this.config = cfg; //Load config
-    this.world = new World(this.config["width"], this.config["height"]); //Risky
+    this.world = new World(this.config["world"]["width"], this.config["world"]["height"], this.config["world"]["backgroundImage"]); //Risky
 
   }
 
