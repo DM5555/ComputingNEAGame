@@ -14,13 +14,11 @@ export class World{
   private entities:Entity[]; //All of the entities in the world.
   public readonly sizeX:number; //World size in x.
   public readonly sizeY:number; //World size in y.
-  public readonly backgroundImage:string;
   public readonly eventRegistry:DGEventListenerRegistry;
 
-  constructor(sizeX:number, sizeY:number, backgroundImage:string){ //Create a new world with the given dimensions and background image URL.
+  constructor(sizeX:number, sizeY:number){ //Create a new world with the given dimension.
     this.sizeX = sizeX;
     this.sizeY = sizeY;
-    this.backgroundImage = backgroundImage;
 
     this.eventRegistry = new DGEventListenerRegistry(); //Create event listener registry.
     this.entities = []; //Create new entity list.

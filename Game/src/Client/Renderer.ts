@@ -9,6 +9,7 @@ import {World} from "../Common/World";
 import {Entity} from "../Common/Entity";
 import {RigidObject} from "../Common/RigidObject";
 import {Vector2} from "../Common/Vector2";
+import {ClientFileLoader} from "./ClientFileLoader";
 
 export class Renderer {
 
@@ -40,14 +41,17 @@ export class Renderer {
       height: 256,
       backgroundColor: 16777215 //Solid white.
     });
+  }
 
+  /**Loads background and application size. Must be called after loadAssets. */
+  public setup():void{
     this.loadBackgroundImage(); //Load the background image into the game.
 
     window.addEventListener("resize",()=>{ //On parent element resize
       this.updateWindowToScreen(); //Resize
     });
 
-    container.appendChild(this.app.view); //Add renderer to body.
+    this.container.appendChild(this.app.view); //Add renderer to body.
 
 
     //Create an event listener for the world when entities are added.
@@ -111,17 +115,14 @@ export class Renderer {
     this.app.stage.addChild(graphics); //Add to graphics
   }
 
-  /** Load the background image as a sprite. */
+  /** Load the background image as a sprite (requires loadAssets to be called first.). */
   private loadBackgroundImage():void{ //Asynchronously adds the background image.
-    console.debug("Background Image URL: " + this.world.backgroundImage); //Debug
-    PIXI.loader.add("BackgroundImage",this.world.backgroundImage,()=>{}).load(()=>{ //Load the image and then run the callback
-      let backgroundTexture: PIXI.Texture = PIXI.utils.TextureCache["BackgroundImage"]; //Load background image from texture cache.
-      this.backgroundSprite = new PIXI.Sprite(backgroundTexture); //Create a sprite.
-      this.backgroundSprite.anchor.set(0.5,0.5); //Anchor the sprite's center to the center of the image.
-      this.app.stage.addChild(this.backgroundSprite); //Add the sprite to the stage.
+    let backgroundTexture: PIXI.Texture = PIXI.utils.TextureCache["BackgroundImage"]; //Load background image from texture cache.
+    this.backgroundSprite = new PIXI.Sprite(backgroundTexture); //Create a sprite.
+    this.backgroundSprite.anchor.set(0.5,0.5); //Anchor the sprite's center to the center of the image.
+    this.app.stage.addChild(this.backgroundSprite); //Add the sprite to the stage.
 
-      this.updateWindowToScreen();
-    });
+    this.updateWindowToScreen();
   }
 
   /**Update the canvas size to the parent element.*/
@@ -132,4 +133,31 @@ export class Renderer {
     this.backgroundSprite.scale.set(this.app.renderer.height/960,this.app.renderer.height/960); //Scale bound to height.
   }
 
+  /**Load all of the game's assets for the renderer. */
+  public loadAssets(fileLoader:ClientFileLoader):Promise<object>{
+    return new Promise((resolve:(()=>void),reject:((err:any)=>void))=>{ //Create a promise object for the asset loader.
+      fileLoader.loadAssetRegistry().then((assetRegistry:object)=>{ //Load the asset registry.
+        //Create a list of files to load.
+        let assetQueue:object = {};
+        for (let key of Object.keys(assetRegistry)){ //Index assets and add them to the queue.
+          assetQueue[key] = 0; //Set status of asset to not
+        }
+
+        let assetsToProcess:number = Object.keys(assetQueue).length; //Store number of assets that need to be processed.
+
+        console.log(assetQueue);
+        for (let i of Object.keys(assetQueue)){ //Process the queue.
+          PIXI.loader.add(i,"/static/game/src/resources/" + assetRegistry[i]).load(()=>{ //Load asset.
+            assetQueue[i] = 1; //Register asset as loaded.
+            assetsToProcess--; //Decrement counter of remaining assets.
+            if (assetsToProcess === 0){ //Resoulve when the number of remaining assets hits 0.
+              resolve();
+            }
+          });
+        }
+      }).catch((e:any)=>{ //Catch any errors.
+        reject(e);
+      });
+    });
+  }
 }

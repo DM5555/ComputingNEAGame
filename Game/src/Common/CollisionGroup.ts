@@ -14,7 +14,7 @@ export class CollisionGroup{
   public addEntity(e:Entity):void{ //Add an entity to the entities list.
     this.entities.push(e);
   }
-
+  
   // NOTE: For objects in the same group to collide, the collision group must have itself listed in the colliding groups.
   public addCollidingGroup(cg:CollisionGroup):void{ //Adds a collision group for this group to collide to.
     if (this.collidingGroups.indexOf(cg) === -1){ //Make sure it isnt already in the list.

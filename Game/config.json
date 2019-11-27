@@ -1,7 +1,6 @@
 {
   "world": {
     "width": 300,
-    "height": 300,
-    "backgroundImage": "/static/game/src/resources/background.svg"
+    "height": 300
   }
 }
