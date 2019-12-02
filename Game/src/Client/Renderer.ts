@@ -17,6 +17,8 @@ export class Renderer {
   public readonly container:HTMLElement;
   private entityGraphicsLink:Map<Entity,PIXI.Graphics>;
   public readonly world:World;
+  private pixelsPerMetre:number;
+  private cameraPosition:Vector2;
 
   private backgroundSprite:PIXI.Sprite; //Background image sprite.
 
@@ -25,6 +27,8 @@ export class Renderer {
     this.container = container; //Set the container field.
     this.world = world;
     this.entityGraphicsLink = new Map();
+    this.pixelsPerMetre = 32; //Default zoom scale.
+    this.cameraPosition = new Vector2(this.world.sizeX/2,this.world.sizeY/2); //Default camera posiiton si
 
     //Log whether WebGL or canvas is being used.
     if (PIXI.utils.isWebGLSupported()){
@@ -97,10 +101,11 @@ export class Renderer {
 
   /**Tansform the world coordinates into the render co-ordinates.*/
   public resolveWorldCoordsToRender(coords:Vector2):Vector2{
-    let xMultiplier:number = this.app.renderer.width/this.world.sizeX; //Horizontal scale.
-    let yMultiplier:number = this.app.renderer.height/this.world.sizeY; //Vertical scale.
-
-    return new Vector2(coords.a*xMultiplier,coords.b*yMultiplier); //Return new coordinates multiplied by their respective scale factors.
+    let cameraAdjustedCoords:Vector2 = new Vector2(coords.a-this.cameraPosition.a,coords.b-this.cameraPosition.b); //Adjust the position to the camera position.
+    let uncenteredPos:Vector2 = new Vector2(cameraAdjustedCoords.a*this.pixelsPerMetre, cameraAdjustedCoords.b*this.pixelsPerMetre); //Adjust the position to actual pixel units.
+    let screenPosition:Vector2 = new Vector2(uncenteredPos.a+this.app.renderer.width/2, uncenteredPos.b+this.app.renderer.height/2); //Adjust to the center of the screen.
+    console.log("POS CHANGE: (" + coords.a + "," + coords.b + ") ("+screenPosition.a+","+screenPosition.b+")");
+    return screenPosition;
   }
 
   /**Make a 100 by 100 square using the line and fill feature to see if everything works.*/
@@ -159,5 +164,15 @@ export class Renderer {
         reject(e);
       });
     });
+  }
+
+  /**Get the current pixel to meter ratio.*/
+  public getZoom():number{
+    return this.pixelsPerMetre;
+  }
+
+  /**Get the current pixel to meter ratio.*/
+  public setZoom(zoom:number):void{
+    this.pixelsPerMetre = zoom;
   }
 }

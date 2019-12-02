@@ -12,8 +12,8 @@ import {DGEventListenerRegistry} from "./DGEventListenerRegistry"
 export class World{
   private collisionGroups: CollisionGroup[]; //This is a dynamic list of collision groups.
   private entities:Entity[]; //All of the entities in the world.
-  public readonly sizeX:number; //World size in x.
-  public readonly sizeY:number; //World size in y.
+  public readonly sizeX:number; //World width.
+  public readonly sizeY:number; //World height.
   public readonly eventRegistry:DGEventListenerRegistry;
 
   constructor(sizeX:number, sizeY:number){ //Create a new world with the given dimension.

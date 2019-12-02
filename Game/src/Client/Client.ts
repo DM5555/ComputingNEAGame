@@ -21,8 +21,8 @@ export class Client extends InvokingInstance{
 
         // TEMP: for testing
         this.gameState.world.addRectangle(
-          new Vector2(75,75), //50 by 75.
-          new Vector2(100,100), //100 along, 100 down.
+          new Vector2(4,4), //4m by 4m.
+          new Vector2(30,16), //34 along, 20 down.
           new Vector2(0,0) //Stationary.
         );
       });
