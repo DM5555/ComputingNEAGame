@@ -1,0 +1,42 @@
+{
+  "Up": [
+    "KeyW",
+    "KeyI",
+    "ArrowUp",
+    "Numpad8",
+    "Numpad7",
+    "Numpad9"
+  ],
+
+  "Down": [
+    "KeyS",
+    "KeyK",
+    "ArrowDown",
+    "Numpad2",
+    "Numpad1",
+    "Numpad3"
+  ],
+
+  "Left": [
+    "KeyA",
+    "KeyJ",
+    "ArrowLeft",
+    "Numpad4",
+    "Numpad7",
+    "Numpad1"
+  ],
+
+  "Right": [
+    "KeyD",
+    "KeyL",
+    "ArrowRight",
+    "Numpad6",
+    "Numpad9",
+    "Numpad3"
+  ],
+
+  "Jump": [
+    "Space",
+    "Numpad0"
+  ]
+}

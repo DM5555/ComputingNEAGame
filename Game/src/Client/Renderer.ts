@@ -141,7 +141,7 @@ export class Renderer {
   /**Load all of the game's assets for the renderer. */
   public loadAssets(fileLoader:ClientFileLoader):Promise<object>{
     return new Promise((resolve:(()=>void),reject:((err:any)=>void))=>{ //Create a promise object for the asset loader.
-      fileLoader.loadAssetRegistry().then((assetRegistry:object)=>{ //Load the asset registry.
+      fileLoader.loadJSONFile("resources").then((assetRegistry:object)=>{ //Load the asset registry.
         //Create a list of files to load.
         let assetQueue:object = {};
         for (let key of Object.keys(assetRegistry)){ //Index assets and add them to the queue.

@@ -28,7 +28,7 @@ export class DGEventListenerRegistry {
   }
 
   /**Dispatch all events under the name. (Res is the data to pass to the callback functions)*/
-  public dispatchEvent(eventName:string,res:any):void{
+  public dispatchEvent(eventName:string,res?:any):void{
     for (let l of this.eventListeners){
       if (l.eventName == eventName){
         l.callback(res);

@@ -14,7 +14,7 @@ export class World{
   private entities:Entity[]; //All of the entities in the world.
   public readonly sizeX:number; //World width.
   public readonly sizeY:number; //World height.
-  public readonly eventRegistry:DGEventListenerRegistry;
+  public readonly eventRegistry:DGEventListenerRegistry; //Event registry.
 
   constructor(sizeX:number, sizeY:number){ //Create a new world with the given dimension.
     this.sizeX = sizeX;

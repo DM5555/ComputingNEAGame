@@ -27,16 +27,16 @@ export class ClientFileLoader implements FileLoader {
     });
   }
 
-  /**Load assets.json file. */
-  public loadAssetRegistry():Promise<object>{ //Despite being similar to the loadconfig function this is not implemented from an interface.
+  /**Load <name>.json file. This used to exclusively do resources.json but is now adaptable for more files*/
+  public loadJSONFile(name:string):Promise<object>{ //Despite being similar to the loadconfig function this is not implemented from an interface.
     return new Promise((resolve:(obj:object)=>void,reject:(errCode:number)=>void)=>{ //Async promise.
       const xhrRequest:XMLHttpRequest = new XMLHttpRequest();
 
       xhrRequest.onreadystatechange = ()=>{ //XHR state change.
         if (xhrRequest.readyState === XMLHttpRequest.DONE){ //Wait for request to finish.
           if (xhrRequest.status === 200){ //Status code 200 means that the file was found.
-            let assetRegistry:object = JSON.parse(xhrRequest.responseText); //Parse the response JSON.
-            resolve(assetRegistry); //Resolve with the asset registry.
+            let objectJSON:object = JSON.parse(xhrRequest.responseText); //Parse the response JSON.
+            resolve(objectJSON); //Resolve with the asset registry.
           } else { //There was a problem loading the asset registry.
             console.error("The asset registry failed to load! Error: " + xhrRequest.status);
             reject(xhrRequest.status);
@@ -44,7 +44,7 @@ export class ClientFileLoader implements FileLoader {
         }
       };
 
-      xhrRequest.open("GET","/static/game/src/resources/resources.json"); //Create the request with a URL.
+      xhrRequest.open("GET","/static/game/src/resources/"+name+".json"); //Create the request with a URL.
       xhrRequest.send(); //Send request.
     });
   }
