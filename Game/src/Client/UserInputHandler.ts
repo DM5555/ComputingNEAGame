@@ -25,20 +25,20 @@ export class UserInputHandler {
         this.keys = new Map(); //Initialise keys list.
         this.keyActionBindings = <[[KeyboardAction,KeyboardKey]]>new Array(); //Initialise keyActionBindings
         for (let action of Object.keys(keyJSON)){ //Index keyJSON and register each key.
-          let actionObject = new KeyboardAction(action); //Create action object.
+          let actionObject:KeyboardAction = new KeyboardAction(action); //Create action object.
           this.actions.set(action,actionObject); //Add action to map.
           for (let key of keyJSON[action]){ //Index every key of each action.
             if (!this.keys.has(key)){ //Only create a new key object if it is not already present.
               let keyObject:KeyboardKey = new KeyboardKey(key); //Create a new key object.
               this.keys.set(key,keyObject);  //Add this to the mapping.
             }
-            let keyObject = this.keys.get(key); //Get the key object to register in the binding.
+            let keyObject:KeyboardKey = this.keys.get(key); //Get the key object to register in the binding.
             this.keyActionBindings.push([actionObject,keyObject]); //Add this to the bindings.
           }
         }
         this.registerWindowEvents();
         resolve(); //End promise here.
-      }).catch((e)=>{ //Keymap fails to load.
+      }).catch((e:any)=>{ //Keymap fails to load.
         console.log("The keymap could not be loaded!");
         reject(e);
       })
@@ -72,8 +72,8 @@ export class UserInputHandler {
   /**Create the event handler for the window. Should alaways called from setup()*/
   private registerWindowEvents():void{
     //Functions below must be passed like this because JavaScript is weird with scoping.
-    window.addEventListener("keydown",(evt)=>{this.windowKeyDown(evt)}) //Keydown event.
-    window.addEventListener("keyup",(evt)=>{this.windowKeyUp(evt)}); //Keyup event.
+    window.addEventListener("keydown",(evt:KeyboardEvent)=>{this.windowKeyDown(evt)}) //Keydown event.
+    window.addEventListener("keyup",(evt:KeyboardEvent)=>{this.windowKeyUp(evt)}); //Keyup event.
   }
 
   /**Called on window keydown.*/
@@ -82,7 +82,7 @@ export class UserInputHandler {
       let key:KeyboardKey = this.keys.get(keyboardEvent.code); //Get key.
       if (!key.isPressed()){ //Only if the key is not already pressed.
         key.keyPress(); //Activate the key.
-        let associatedActions = this.getActionsFromKey(key); //Get all actions which this key is bound to.
+        let associatedActions:[KeyboardAction] = this.getActionsFromKey(key); //Get all actions which this key is bound to.
         for (let action of associatedActions){ //Index each acton.
           if (!action.isActive()){ //Only if the action is not active.
             action.actionStart(); //Set action to active.
@@ -99,10 +99,10 @@ export class UserInputHandler {
       let key:KeyboardKey = this.keys.get(keyboardEvent.code); //Get key object.
       if (key.isPressed()){ //Only if the key is recorded as pressed.
         key.keyRelease(); //Disable key.
-        let associatedActions = this.getActionsFromKey(key); //Get associated actions.
+        let associatedActions:[KeyboardAction] = this.getActionsFromKey(key); //Get associated actions.
         for (let action of associatedActions){ //Index these actions.
           if (action.isActive()){ //Only if this action is active.
-            let actionKeys = this.getKeysFromAction(action); //Get keys bound to this action.
+            let actionKeys:[KeyboardKey] = this.getKeysFromAction(action); //Get keys bound to this action.
             let anyKeysPressed:boolean = false; //Whether any actions are active.
             for (let k of actionKeys){ //Index action keys list.
               if (k.isPressed()){ //There is a key pressed so dont stop the event.
