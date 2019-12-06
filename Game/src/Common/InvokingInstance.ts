@@ -1,6 +1,6 @@
 /*
 This class is the core class for the client and the server, but abstact as the this will either
-be run from the server or client class.
+be invoked from the server or client class.
 */
 import {GameState} from "./GameState";
 import {Context} from "./Context";
