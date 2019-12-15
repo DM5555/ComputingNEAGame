@@ -41,6 +41,7 @@ export class World{
     }
   }
 
+
   /**Gets all of the entities in the world.*/
   public getEntities():Entity[]{
     let clonedEntities:Entity[] = [];
@@ -49,7 +50,7 @@ export class World{
   }
 
   /**Add a rectangle to the world.*/
-  public addRectangle(size:Vector2,pos:Vector2,velocity:Vector2):RigidObject{
+  public addRectangle(size:Vector2,pos:Vector2,velocity:Vector2,textureName?:string):RigidObject{
     let boxNodes:Vector2[] = [ //Create box.
       new Vector2(-size.a/2,-size.b/2), //Top left.
       new Vector2(size.a/2,-size.b/2), //Top right.
@@ -58,7 +59,7 @@ export class World{
     ];
     let bBox:BoundingBox = new BoundingBox(boxNodes);
 
-    let rigidObject:RigidObject = new RigidObject(bBox,bBox,pos,velocity); //Create object.
+    let rigidObject:RigidObject = new RigidObject(bBox,bBox,pos,velocity,textureName); //Create object.
     this.entities.push(rigidObject); //Add object to world.
     this.eventRegistry.dispatchEvent("addEntity",rigidObject); //Dispatch an add entity event.
     return rigidObject; //Return object.

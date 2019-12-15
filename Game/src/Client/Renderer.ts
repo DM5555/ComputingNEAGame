@@ -15,10 +15,11 @@ export class Renderer {
 
   public readonly app:PIXI.Application;
   public readonly container:HTMLElement;
-  private entityGraphicsLink:Map<Entity,PIXI.Graphics>;
+  private entityDisplayLink:Map<Entity,PIXI.DisplayObject>;
   public readonly world:World;
   private pixelsPerMetre:number;
   private cameraPosition:Vector2;
+  private frameCount:number;
 
   private backgroundSprite:PIXI.Sprite; //Background image sprite.
 
@@ -26,9 +27,11 @@ export class Renderer {
   constructor(container:HTMLElement,world:World){
     this.container = container; //Set the container field.
     this.world = world;
-    this.entityGraphicsLink = new Map();
+    this.entityDisplayLink = new Map();
     this.pixelsPerMetre = 32; //Default zoom scale.
-    this.cameraPosition = new Vector2(this.world.sizeX/2,this.world.sizeY/2); //Default camera posiiton si
+    this.cameraPosition = new Vector2(this.world.sizeX/2,this.world.sizeY/2); //Default camera posiiton.
+    this.frameCount = 0;
+
 
     //Log whether WebGL or canvas is being used.
     if (PIXI.utils.isWebGLSupported()){
@@ -57,18 +60,44 @@ export class Renderer {
 
     this.container.appendChild(this.app.view); //Add renderer to body.
 
-
     //Create an event listener for the world when entities are added.
     this.world.eventRegistry.addEventListener("addEntity",(ent:Entity)=>{
       console.log("Entity add event called!"); // TODO: Remove this in the future.
 
-      let graphics:PIXI.Graphics = this.createGraphicsFromEntity(ent);
+      if (ent instanceof RigidObject){
+        //let uncutTexture:PIXI.BaseTexture = PIXI.utils.BaseTextureCache[(<RigidObject>ent).getTextureName()];
+        //let mask:PIXI.Graphics = this.createGraphicsFromEntity(ent); //Create the mask.
+        let texture:PIXI.Texture = new PIXI.Texture(PIXI.utils.TextureCache[(<RigidObject>ent).getTextureName()]);
 
-      this.entityGraphicsLink.set(ent,graphics); //Add to entity graphics mapping.
+        let sprite:PIXI.Sprite = new PIXI.Sprite(texture); //Create the sprite
+        this.entityDisplayLink.set(ent,sprite); //Add to entity graphics mapping.
 
-      this.app.stage.addChild(graphics); //Add the object to the stage.
+        this.app.stage.addChild(sprite); //Add the object to the stage.
+      }
 
     });
+
+    window.requestAnimationFrame(()=>{this.animate()}); //Begin animation looping.
+
+
+  }
+
+  /**Main animation loop. Calls recursively.*/
+  public animate(){
+    this.entityDisplayLink.forEach((displayObject,entity,map)=>{ //TODO: Avoid updating things when they don't need to in order to optimise.
+      if (entity instanceof RigidObject){ //Divide the scale by 512 if it is a rigid object because of the texture size.
+        displayObject.scale.set(this.pixelsPerMetre/512,this.pixelsPerMetre/512);
+        console.log("Rendering by 512.")
+      } else {
+        displayObject.scale.set(this.pixelsPerMetre,this.pixelsPerMetre);
+        console.log("Default rendering.")
+      }
+      let objectPosition = this.resolveWorldCoordsToRender(entity.position);
+      displayObject.position.set(objectPosition.a,objectPosition.b);
+    });
+    window.requestAnimationFrame(()=>{this.animate()}); //Recursively request another frame.
+    this.app.renderer.render(this.app.stage);
+    this.frameCount++;
   }
 
   /**Create a pixi graphics object from an entity.*/
@@ -79,18 +108,28 @@ export class Renderer {
       let nodeQueue:Array<Vector2> = []; //Create an empty queue of nodes.
       Object.assign(nodeQueue,ent.getWorldDrawmodel().nodes); //Copy the nodes from the drawmodel relative to the world.
 
-      let firstPoint:Vector2 = this.resolveWorldCoordsToRender(nodeQueue.shift()); //Move to first node.
+
+
+      let firstPoint:Vector2 = nodeQueue.shift(); //Move to first node.
       graphics.moveTo(firstPoint.a,firstPoint.b); //Begin at this point.
 
-      //TODO IMPLEMENT COLOURS AND OTHER STUFF:
-      graphics.lineStyle(3,0x0000FF); //Blue 3px line.
+      graphics.lineStyle(0); //No line.
+      graphics.beginFill(0x000000);
+
 
       while (nodeQueue.length > 0){ //Process node queue.
-        let currentPoint:Vector2 = this.resolveWorldCoordsToRender(nodeQueue.shift()); //Translate node into render size.
+        let currentPoint:Vector2 = nodeQueue.shift(); //Shift next point from queue.
         graphics.lineTo(currentPoint.a,currentPoint.b); //Draw line to next point.
       }
 
-      graphics.closePath(); //Close the path.
+      graphics.endFill();
+
+      let graphicsPosition = this.resolveWorldCoordsToRender(ent.position); //Get adjusted position for the graphics object.
+
+      graphics.position.set(graphicsPosition.a,graphicsPosition.b); //Set the position.
+      graphics.scale.set(this.pixelsPerMetre,this.pixelsPerMetre);
+
+      console.log(graphicsPosition.a,graphicsPosition.b);
 
       return graphics;
 
@@ -104,7 +143,6 @@ export class Renderer {
     let cameraAdjustedCoords:Vector2 = new Vector2(coords.a-this.cameraPosition.a,coords.b-this.cameraPosition.b); //Adjust the position to the camera position.
     let uncenteredPos:Vector2 = new Vector2(cameraAdjustedCoords.a*this.pixelsPerMetre, cameraAdjustedCoords.b*this.pixelsPerMetre); //Adjust the position to actual pixel units.
     let screenPosition:Vector2 = new Vector2(uncenteredPos.a+this.app.renderer.width/2, uncenteredPos.b+this.app.renderer.height/2); //Adjust to the center of the screen.
-    console.log("POS CHANGE: (" + coords.a + "," + coords.b + ") ("+screenPosition.a+","+screenPosition.b+")");
     return screenPosition;
   }
 
@@ -142,24 +180,14 @@ export class Renderer {
   public loadAssets(fileLoader:ClientFileLoader):Promise<object>{
     return new Promise((resolve:(()=>void),reject:((err:any)=>void))=>{ //Create a promise object for the asset loader.
       fileLoader.loadJSONFile("resources").then((assetRegistry:object)=>{ //Load the asset registry.
-        //Create a list of files to load.
-        let assetQueue:object = {};
-        for (let key of Object.keys(assetRegistry)){ //Index assets and add them to the queue.
-          assetQueue[key] = 0; //Set status of asset to not
+
+        for (let i of Object.keys(assetRegistry)){ //Process the queue.
+          PIXI.loader.add(i,"/static/game/src/resources/" + assetRegistry[i]);
         }
 
-        let assetsToProcess:number = Object.keys(assetQueue).length; //Store number of assets that need to be processed.
-
-        console.log(assetQueue);
-        for (let i of Object.keys(assetQueue)){ //Process the queue.
-          PIXI.loader.add(i,"/static/game/src/resources/" + assetRegistry[i]).load(()=>{ //Load asset.
-            assetQueue[i] = 1; //Register asset as loaded.
-            assetsToProcess--; //Decrement counter of remaining assets.
-            if (assetsToProcess === 0){ //Resoulve when the number of remaining assets hits 0.
-              resolve();
-            }
-          });
-        }
+        PIXI.loader.load(()=>{ //Actually load the assets now.
+          resolve();
+        });
       }).catch((e:any)=>{ //Catch any errors.
         reject(e);
       });
@@ -174,5 +202,16 @@ export class Renderer {
   /**Get the current pixel to meter ratio.*/
   public setZoom(zoom:number):void{
     this.pixelsPerMetre = zoom;
+  }
+
+  /**Get camera position. */
+  public getCameraPosition():Vector2{
+    return new Vector2(this.cameraPosition.a,this.cameraPosition.b); //Safely clone the object.
+  }
+
+  /**Set camera position. */
+  public setCameraPosition(pos:Vector2){
+    this.cameraPosition.a = pos.a;
+    this.cameraPosition.b = pos.b;
   }
 }

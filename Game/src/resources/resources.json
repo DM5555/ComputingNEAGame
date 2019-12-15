@@ -1,3 +1,5 @@
 {
-  "BackgroundImage":"background.svg"
+  "BackgroundImage":"background.svg",
+  "DefaultTexture":"missing_texture.svg",
+  "Bricks":"bricks.svg"
 }
