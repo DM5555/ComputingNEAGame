@@ -70,6 +70,8 @@ export class Renderer {
         let texture:PIXI.Texture = new PIXI.Texture(PIXI.utils.TextureCache[(<RigidObject>ent).getTextureName()]);
 
         let sprite:PIXI.Sprite = new PIXI.Sprite(texture); //Create the sprite
+
+        sprite.pivot.set(sprite.width/2,sprite.height/2);
         this.entityDisplayLink.set(ent,sprite); //Add to entity graphics mapping.
 
         this.app.stage.addChild(sprite); //Add the object to the stage.
@@ -87,13 +89,13 @@ export class Renderer {
     this.entityDisplayLink.forEach((displayObject,entity,map)=>{ //TODO: Avoid updating things when they don't need to in order to optimise.
       if (entity instanceof RigidObject){ //Divide the scale by 512 if it is a rigid object because of the texture size.
         displayObject.scale.set(this.pixelsPerMetre/512,this.pixelsPerMetre/512);
-        console.log("Rendering by 512.")
+
       } else {
         displayObject.scale.set(this.pixelsPerMetre,this.pixelsPerMetre);
-        console.log("Default rendering.")
       }
       let objectPosition = this.resolveWorldCoordsToRender(entity.position);
       displayObject.position.set(objectPosition.a,objectPosition.b);
+      displayObject.rotation = entity.rotation;
     });
     window.requestAnimationFrame(()=>{this.animate()}); //Recursively request another frame.
     this.app.renderer.render(this.app.stage);

@@ -10,10 +10,9 @@ export class RigidObject extends Entity {
   public readonly hitbox:BoundingBox;
   public readonly drawmodel:BoundingBox;
   public velocity:Vector2; //Velocity of object.
-  public oldPosition:Vector2; //Position object prior to move. Used to smooth out movement when rendering.
   public readonly eventRegistry:DGEventListenerRegistry;
   private textureName:string;
-  private textureScale:number;
+
 
   /**Create a new rigit object entity.*/
   constructor(hitbox:BoundingBox, drawmodel:BoundingBox, position:Vector2, velocity:Vector2, textureName?:string){
@@ -22,6 +21,7 @@ export class RigidObject extends Entity {
     this.drawmodel = drawmodel;
     this.velocity = velocity;
     this.eventRegistry = new DGEventListenerRegistry();
+    this.rotation = 0;
     if (typeof textureName === "undefined"){
       this.textureName = "DefaultTexture"
     } else {

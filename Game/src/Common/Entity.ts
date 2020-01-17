@@ -7,6 +7,7 @@ import {Vector2} from "./Vector2";
 export abstract class Entity{
   //All entities have the following properties:
   public position:Vector2;
+  public rotation:number; //Rotation. Measured in radians.
 
   constructor(pos:Vector2){ //Empty constructor
     this.position = pos;
