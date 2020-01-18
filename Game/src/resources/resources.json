@@ -1,5 +1,9 @@
 {
   "BackgroundImage":"background.svg",
+  "BackgroundFar":"background0.svg",
+  "BackgroundMid":"background1.svg",
+  "BackgroundClose":"background2.svg",
   "DefaultTexture":"missing_texture.svg",
-  "Bricks":"bricks.svg"
+  "Bricks":"bricks.svg",
+  "Stripes":"stripes.svg"
 }

@@ -29,44 +29,87 @@ export class Client extends InvokingInstance{
 
         // TEMP: for testing
         this.gameState.world.addRectangle(
-          new Vector2(4,4), //4m by 4m.
+          new Vector2(1,1), //4m by 4m.
           new Vector2(0,0), //30 along, 16 down.
           new Vector2(0,0), //Stationary.
           "Bricks"
         );
+
         this.gameState.world.addRectangle(
-          new Vector2(2,2),
-          new Vector2(25,20),
-          new Vector2(0,0)
+          new Vector2(1,1), //4m by 4m.
+          new Vector2(63,35), //30 along, 16 down.
+          new Vector2(0,0), //Stationary.
+          "Bricks"
         );
+        this.gameState.world.addRectangle(
+          new Vector2(66,1),
+          new Vector2(-1,-1),
+          new Vector2(0,0),
+          "Stripes"
+        );
+        this.gameState.world.addRectangle(
+          new Vector2(66,1),
+          new Vector2(-1,36),
+          new Vector2(0,0),
+          "Stripes"
+        );
+        this.gameState.world.addRectangle(
+          new Vector2(1,36),
+          new Vector2(-1,0),
+          new Vector2(0,0),
+          "Stripes"
+        );
+        this.gameState.world.addRectangle(
+          new Vector2(1,36),
+          new Vector2(64,0),
+          new Vector2(0,0),
+          "Stripes"
+        );
+
 
         setInterval(()=>{ //TESTING (Also RIP VSync.)
           let newCameraPosition:Vector2 = this.renderer.getCameraPosition();
 
           if (this.userInputHandler.isActionActive("Up") && !this.userInputHandler.isActionActive("Down")){
-            if(newCameraPosition.b > 0){
+            if(newCameraPosition.b >= 0){
               newCameraPosition.b-=0.1;
+            }
+
+            if(newCameraPosition.b < 0){
+              newCameraPosition.b=0;
             }
           }
           if (this.userInputHandler.isActionActive("Down") && !this.userInputHandler.isActionActive("Up")){
-            if(newCameraPosition.b < this.gameState.world.sizeY-0.1){
+            if(newCameraPosition.b <= this.gameState.world.sizeY){
               newCameraPosition.b+=0.1;
+            }
+
+            if(newCameraPosition.b > this.gameState.world.sizeY){
+              newCameraPosition.b=this.gameState.world.sizeY;
             }
           }
           if (this.userInputHandler.isActionActive("Left") && !this.userInputHandler.isActionActive("Right")){
-            if(newCameraPosition.a > 0){
+            if(newCameraPosition.a >= 0){
               newCameraPosition.a-=0.1;
+            }
+
+            if(newCameraPosition.a < 0){
+              newCameraPosition.a=0;
             }
           }
           if (this.userInputHandler.isActionActive("Right") && !this.userInputHandler.isActionActive("Left")){
-            if(newCameraPosition.a < this.gameState.world.sizeX/2){
+            if(newCameraPosition.a <= this.gameState.world.sizeX){
               newCameraPosition.a+=0.1;
+            }
+
+            if(newCameraPosition.a > this.gameState.world.sizeX){
+              newCameraPosition.a=this.gameState.world.sizeX;
             }
           }
 
           this.renderer.setCameraPosition(newCameraPosition);
         },1000/120);
-        
+
       });
     }); //Invoke superclass.
   }

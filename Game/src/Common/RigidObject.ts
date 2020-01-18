@@ -45,9 +45,4 @@ export class RigidObject extends Entity {
     return this.textureName;
   }
 
-  public setTextureName(textureName:string){
-    this.textureName = textureName;
-    this.eventRegistry.dispatchEvent("TextureChange",textureName);
-  }
-
 }

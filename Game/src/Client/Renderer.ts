@@ -18,17 +18,21 @@ export class Renderer {
   private entityDisplayLink:Map<Entity,PIXI.DisplayObject>;
   public readonly world:World;
   private pixelsPerMetre:number;
+  private scaleFactor:number;
+  private _zoom:number;
   private cameraPosition:Vector2;
   private frameCount:number;
 
-  private backgroundSprite:PIXI.Sprite; //Background image sprite.
+  private backgroundSprites:[PIXI.Sprite,PIXI.Sprite,PIXI.Sprite]; //Background image sprites.
 
   /** Create a new render object in the container element specified and the world given..*/
   constructor(container:HTMLElement,world:World){
     this.container = container; //Set the container field.
     this.world = world;
     this.entityDisplayLink = new Map();
-    this.pixelsPerMetre = 32; //Default zoom scale.
+    this._zoom = 1; //Default zoom scale.
+    this.scaleFactor = 32;
+    this.updatePPM(); //Set pixels per metre ratio.
     this.cameraPosition = new Vector2(this.world.sizeX/2,this.world.sizeY/2); //Default camera posiiton.
     this.frameCount = 0;
 
@@ -65,16 +69,20 @@ export class Renderer {
       console.log("Entity add event called!"); // TODO: Remove this in the future.
 
       if (ent instanceof RigidObject){
-        //let uncutTexture:PIXI.BaseTexture = PIXI.utils.BaseTextureCache[(<RigidObject>ent).getTextureName()];
-        //let mask:PIXI.Graphics = this.createGraphicsFromEntity(ent); //Create the mask.
+
         let texture:PIXI.Texture = new PIXI.Texture(PIXI.utils.TextureCache[(<RigidObject>ent).getTextureName()]);
 
-        let sprite:PIXI.Sprite = new PIXI.Sprite(texture); //Create the sprite
+        let objectbounds:[number,number,number,number] = this.getRigidObjectDisplayBounds(ent);
+        let squareWidth:number = Math.abs(objectbounds[3]-objectbounds[1]);
+        let squareHeight:number = Math.abs(objectbounds[2]-objectbounds[0]);
+        let tilingSprite:PIXI.extras.TilingSprite = new PIXI.extras.TilingSprite(texture,squareWidth*512,squareHeight*512); //Create a tiling sprite.
+        tilingSprite.scale.set(1/512,1/512); //Scale it down to 1/8th because the texture will be 64*64.
+        tilingSprite.anchor.set(0,0);
 
-        sprite.pivot.set(sprite.width/2,sprite.height/2);
-        this.entityDisplayLink.set(ent,sprite); //Add to entity graphics mapping.
+        tilingSprite.pivot.set(tilingSprite.width/2,tilingSprite.height/2);
+        this.entityDisplayLink.set(ent,tilingSprite); //Add to entity graphics mapping.
 
-        this.app.stage.addChild(sprite); //Add the object to the stage.
+        this.app.stage.addChild(tilingSprite); //Add the object to the stage.
       }
 
     });
@@ -84,19 +92,62 @@ export class Renderer {
 
   }
 
+  /**Get the square limits of a rigid object (not including rotation). Order: NESW*/
+  private getRigidObjectDisplayBounds(ent:RigidObject):[number,number,number,number]{
+    let north:number = 0;
+    let east:number = 0;
+    let south:number = 0;
+    let west:number = 0;
+
+    ent.drawmodel.nodes.forEach((node:Vector2)=>{ //Index all nodes; Find boundaries.
+      if (node.a > east){
+        east = node.a;
+      }
+      if (node.a < west){
+        west = node.a;
+      }
+      if (node.b > south){
+        south = node.b
+      }
+      if (node.b < north){
+        north = node.b;
+      }
+    });
+
+    return [north,east,south,west];
+  }
+
   /**Main animation loop. Calls recursively.*/
-  public animate(){
-    this.entityDisplayLink.forEach((displayObject,entity,map)=>{ //TODO: Avoid updating things when they don't need to in order to optimise.
+  public animate():void{
+
+    this.entityDisplayLink.forEach((displayObject:PIXI.DisplayObject,entity:Entity)=>{ //TODO: Avoid updating things when they don't need to in order to optimise.
       if (entity instanceof RigidObject){ //Divide the scale by 512 if it is a rigid object because of the texture size.
         displayObject.scale.set(this.pixelsPerMetre/512,this.pixelsPerMetre/512);
 
       } else {
         displayObject.scale.set(this.pixelsPerMetre,this.pixelsPerMetre);
       }
-      let objectPosition = this.resolveWorldCoordsToRender(entity.position);
+      let objectPosition:Vector2 = this.resolveWorldCoordsToRender(entity.position);
+
+      if (displayObject instanceof PIXI.Sprite){ //Offset coordinates for sprites.
+          objectPosition.a+=(displayObject.width*displayObject.scale.x)/2;
+          objectPosition.b+=(displayObject.height*displayObject.scale.y)/2;
+      }
       displayObject.position.set(objectPosition.a,objectPosition.b);
       displayObject.rotation = entity.rotation;
     });
+
+    for(let i:number=0; i<this.backgroundSprites.length; i++){ //Index background sprites.
+      let bgSprite:PIXI.Sprite = this.backgroundSprites[i];
+      let x:number = bgSprite.position.x;
+      let y:number = this.app.renderer.height/2; //Set y position to vertical center of the screen.
+
+      x = this.app.renderer.width/2 + ((this.world.sizeX/2-this.cameraPosition.a)*(2**i)); //Parallax view.
+
+      bgSprite.position.set(x,y); //Update position.
+
+    }
+
     window.requestAnimationFrame(()=>{this.animate()}); //Recursively request another frame.
     this.app.renderer.render(this.app.stage);
     this.frameCount++;
@@ -126,7 +177,7 @@ export class Renderer {
 
       graphics.endFill();
 
-      let graphicsPosition = this.resolveWorldCoordsToRender(ent.position); //Get adjusted position for the graphics object.
+      let graphicsPosition:Vector2 = this.resolveWorldCoordsToRender(ent.position); //Get adjusted position for the graphics object.
 
       graphics.position.set(graphicsPosition.a,graphicsPosition.b); //Set the position.
       graphics.scale.set(this.pixelsPerMetre,this.pixelsPerMetre);
@@ -162,20 +213,31 @@ export class Renderer {
 
   /** Load the background image as a sprite (requires loadAssets to be called first.). */
   private loadBackgroundImage():void{ //Asynchronously adds the background image.
-    let backgroundTexture: PIXI.Texture = PIXI.utils.TextureCache["BackgroundImage"]; //Load background image from texture cache.
-    this.backgroundSprite = new PIXI.Sprite(backgroundTexture); //Create a sprite.
-    this.backgroundSprite.anchor.set(0.5,0.5); //Anchor the sprite's center to the center of the image.
-    this.app.stage.addChild(this.backgroundSprite); //Add the sprite to the stage.
+    //let backgroundTexture: PIXI.Texture = PIXI.utils.TextureCache["BackgroundImage"]; //Load background image from texture cache.
+    let backgroundFar:PIXI.Texture = PIXI.utils.TextureCache["BackgroundFar"]; //Far background.
+    let backgroundMid:PIXI.Texture = PIXI.utils.TextureCache["BackgroundMid"]; //Mid background.
+    let backgroundClose:PIXI.Texture = PIXI.utils.TextureCache["BackgroundClose"]; //Close background.
+    //Creaqte sprites
+    this.backgroundSprites = [new PIXI.Sprite(backgroundFar),new PIXI.Sprite(backgroundMid),new PIXI.Sprite(backgroundClose)];
+
+    for (let sprite of this.backgroundSprites){
+      sprite.anchor.set(0.5,0.5); //Set sprite anchor to center;
+      this.app.stage.addChild(sprite); //Add the sprite to the stage.
+    }
 
     this.updateWindowToScreen();
   }
 
   /**Update the canvas size to the parent element.*/
   private updateWindowToScreen():void{
-    this.app.renderer.resize(this.container.offsetWidth,this.container.offsetHeight); //Resize to the offsetwidth and offsetheight of parent.
+    this.app.renderer.resize(Math.min(this.container.offsetWidth,this.container.offsetHeight*(7/3)),this.container.offsetHeight); //Resize to the offsetwidth and offsetheight of parent. Limit aspect ratio to 7:3
 
-    this.backgroundSprite.position.set(this.app.renderer.width/2,this.app.renderer.height/2); //Set position to half of height and half width to center the image in the screen.
-    this.backgroundSprite.scale.set(this.app.renderer.height/960,this.app.renderer.height/960); //Scale bound to height.
+    for(let sprite of this.backgroundSprites){ //Scale sprites.
+      sprite.scale.set(this.app.renderer.height/960,this.app.renderer.height/960); //Scale bound to height.
+    }
+
+    this.scaleFactor = this.container.offsetHeight/32;
+    this.updatePPM();
   }
 
   /**Load all of the game's assets for the renderer. */
@@ -196,14 +258,18 @@ export class Renderer {
     });
   }
 
-  /**Get the current pixel to meter ratio.*/
-  public getZoom():number{
-    return this.pixelsPerMetre;
+  get zoom():number{
+    return this._zoom;
   }
 
-  /**Get the current pixel to meter ratio.*/
-  public setZoom(zoom:number):void{
-    this.pixelsPerMetre = zoom;
+  set zoom(z:number){
+    this._zoom = z;
+    this.updatePPM();
+  }
+
+  /**Update pixels per metre ratio.*/
+  private updatePPM():void{
+    this.pixelsPerMetre = this._zoom*this.scaleFactor;
   }
 
   /**Get camera position. */
@@ -212,7 +278,7 @@ export class Renderer {
   }
 
   /**Set camera position. */
-  public setCameraPosition(pos:Vector2){
+  public setCameraPosition(pos:Vector2):void{
     this.cameraPosition.a = pos.a;
     this.cameraPosition.b = pos.b;
   }
