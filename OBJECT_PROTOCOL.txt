@@ -1,0 +1,16 @@
+USE Big Endianness.
+USE ASCII.
+
+For RigidObjects:
+
+AAAA B C DDDD DDDD EEEE EEEE FF (GGGG GGGG)*F HH (IIII IIII)*H
+
+A = Object ID (32 bits)
+B = Texture name length (8 bit u int)
+C = Texture name (Specified by B)
+D = Position (2* 32 bit float)
+E = Velocity (2* 32 bit float)
+F = Amount of hitbox nodes (16 bit u int)
+G = Node positions (2*E 32 bit float)
+H = Amount of drawmodel nodes (16 bit u int)
+I = Node positions (2*G 32 bit float)

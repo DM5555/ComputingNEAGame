@@ -4,6 +4,10 @@ The main class for the server.
 
 import {InvokingInstance} from "../Common/InvokingInstance";
 import {Context} from "../Common/Context";
+import {NetworkTranscoder} from "../Common/NetworkTranscoder";
+import {Vector2} from "../Common/Vector2";
+import {RigidObject} from "../Common/RigidObject";
+
 import WebSocket = require("ws");
 import fs = require("fs");
 import https = require("https");
@@ -30,11 +34,15 @@ export class Server extends InvokingInstance{
 
     this.WSServer.on("connection",(conn:WebSocket)=>{
       console.log("Connection established!");
-      conn.send("Test2");
 
+      let testRectangle:RigidObject = this.gameState.world.addRectangle(new Vector2(10,10), new Vector2(0,0), new Vector2(0,0),"Bricks"); //Test rectangle.
+      let testTranscoder:NetworkTranscoder = new NetworkTranscoder(Context.SERVER);
+
+      conn.send(testTranscoder.encodeRigidObject(testRectangle));
       conn.on("message",(data:string)=>{ //Message recieved.
         console.log("Message recieved: " + data);
       });
+
     });
   }
 }
