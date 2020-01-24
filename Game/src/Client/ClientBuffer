@@ -1,6 +1,0 @@
-import {Buffer} from "../Common/Buffer";
-
-/**Client buffer handler.*/
-export class ClientBuffer implements Buffer {
-
-}

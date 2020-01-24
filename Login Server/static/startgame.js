@@ -1,5 +1,3 @@
-
-
 require(["StartClient"],(sc)=>{ //Load StartClient modules.
 	let modulesImported = Object.keys(require.s.contexts._.registry);
 	let modulesToLoad = [];

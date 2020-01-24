@@ -1,16 +1,18 @@
 import {RigidObject} from "../Common//RigidObject";
-import {Context} from "../Common/Context";
 import {Vector2} from "../Common/Vector2";
-import {Buffer} from "../Common/Buffer";
+import {BoundingBox} from "../Common/BoundingBox";
+import {Entity} from "../Common/Entity";
 
 /**Converts objects and information into data that can be send across the internet.*/
 export class NetworkTranscoder{
   private nextID:number; //ID to use for the next object.
-  private Buffer:{new():Buffer};
+  private IDEntityMappings:Map<number,Entity>;
 
   /**Create a network transcoder. The buffer class must be passed to this.*/
-  constructor(Buffer:{new():Buffer}){
-    this.Buffer = Buffer;
+  constructor(){
+    if (typeof Buffer === undefined){ //Buffer module is undefiend on the client.
+
+    }
   }
 
   /**Encode the (new) RigidObject into data.*/
@@ -76,5 +78,65 @@ export class NetworkTranscoder{
     }
 
     return buf;
+  }
+
+  /**Turn the binary version of a rigid object into a JS object.*/
+  public decodeRigidObject(data:any):RigidObject{
+    let buf:Buffer = Buffer.from(data);
+
+    let offset:number = 0;
+
+    let id:number = buf.readInt32BE(offset); //Read ID.
+    offset+=4;
+
+    let textureLength:number = buf.readUInt8(offset);  //Read texture length.
+    offset+=1;
+
+    let textureName:string = buf.slice(offset,offset+textureLength).toString("ascii"); //Read texture name.
+    offset+=textureLength;
+
+    let positionX:number = buf.readFloatBE(offset); //X position.
+    offset+=4;
+    let positionY:number = buf.readFloatBE(offset); //Y position.
+    offset+=4;
+
+    let velocityX:number = buf.readFloatBE(offset); //X velocity.
+    offset+=4;
+    let velocityY:number = buf.readFloatBE(offset); //Y velocity.
+    offset+=4;
+
+    let hitboxNodeCount:number = buf.readUInt16BE(offset); //Hitbox node count.
+    offset+=2;
+
+    let hitboxNodes:Vector2[] = new Array<Vector2>(); //Create new 2D Vector array.
+    for (let i:number=0; i<hitboxNodeCount; i++){
+      let x:number = buf.readFloatBE(offset); //X position of node.
+      offset+=4;
+      let y:number = buf.readFloatBE(offset); //Y position of node.
+      offset+=4;
+
+      hitboxNodes.push(new Vector2(x,y));
+    }
+
+    let drawmodelNodeCount:number = buf.readUInt16BE(offset); //Drawmodel node count.
+    offset+=2;
+
+    let drawmodelNodes:Vector2[] = new Array<Vector2>(); //Create new 2D Vector array.
+    for (let i:number=0; i<drawmodelNodeCount; i++){
+      let x:number = buf.readFloatBE(offset); //X position of node.
+      offset+=4;
+      let y:number = buf.readFloatBE(offset); //Y position of node.
+      offset+=4;
+
+      drawmodelNodes.push(new Vector2(x,y));
+    }
+
+    let hitbox:BoundingBox = new BoundingBox(hitboxNodes);
+    let drawmodel:BoundingBox = new BoundingBox(drawmodelNodes);
+    let position:Vector2 = new Vector2(positionX,positionY);
+    let velocity:Vector2 = new Vector2(velocityX,velocityY);
+    let ro:RigidObject = new RigidObject(hitbox,drawmodel,position,velocity,textureName); //Create new RigidObject.
+
+    return ro;
   }
 }

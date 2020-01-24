@@ -36,7 +36,7 @@ export class Server extends InvokingInstance{
       console.log("Connection established!");
 
       let testRectangle:RigidObject = this.gameState.world.addRectangle(new Vector2(10,10), new Vector2(0,0), new Vector2(0,0),"Bricks"); //Test rectangle.
-      let testTranscoder:NetworkTranscoder = new NetworkTranscoder(Context.SERVER);
+      let testTranscoder:NetworkTranscoder = new NetworkTranscoder();
 
       conn.send(testTranscoder.encodeRigidObject(testRectangle));
       conn.on("message",(data:string)=>{ //Message recieved.

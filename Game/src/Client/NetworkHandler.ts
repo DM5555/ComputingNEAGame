@@ -1,8 +1,11 @@
+import {NetworkTranscoder} from "../Common/NetworkTranscoder";
+
 /**Does stuff relating to the communications such as handle connections and encode/decode data on the client side. */
 export class NetworkHandler {
   private ws:WebSocket;
-
+  private transcoder:NetworkTranscoder;
   constructor(){
+    this.transcoder = new NetworkTranscoder();
   }
 
   /**Connect to the specified server. */
@@ -13,12 +16,17 @@ export class NetworkHandler {
     this.ws = new WebSocket(url);
     this.ws.onopen = ()=>{
       console.log("WS Connection Established.");
-      setTimeout(()=>{
-        this.ws.send(JSON.stringify({msg:"Test"}));
-      },5000);
 
       this.ws.onmessage = (ev:MessageEvent):any=>{
-        console.log("Data recieved:" + ev.data);
+        let data:any = ev.data;
+        console.log("Data recieved:",ev.data);
+        if (data instanceof Blob){
+          let fr:FileReader = new FileReader(); //Create reader for data.
+          fr.readAsArrayBuffer(data);
+          fr.addEventListener("loadend",()=>{ //Asynchronously read.
+            console.log("RigidObject:",this.transcoder.decodeRigidObject(fr.result));
+          });
+        }
       }
     }
 
