@@ -8,10 +8,12 @@ import {Renderer} from "./Renderer";
 import {Vector2} from "../Common/Vector2"; // TEMP: for testing
 import {ClientFileLoader} from "./ClientFileLoader";
 import {UserInputHandler} from "./UserInputHandler";
+import {NetworkHandler} from "./NetworkHandler";
 
 export class Client extends InvokingInstance{
   private renderer:Renderer;
   private userInputHandler:UserInputHandler;
+  private networkHandler:NetworkHandler;
 
 
   constructor(container:HTMLElement){
@@ -20,11 +22,11 @@ export class Client extends InvokingInstance{
       console.log("Made new client object!");
       this.renderer = new Renderer(container,this.gameState.world); //Create renderer.
       this.userInputHandler = new UserInputHandler();
-
+      this.networkHandler = new NetworkHandler();
       this.userInputHandler.setup(<ClientFileLoader>this.fileLoader).then(()=>{ //Setup the user input handler.
-
       return this.renderer.loadAssets(<ClientFileLoader>this.fileLoader);
     }).then(()=>{ //Another callback (chained promises)).
+        this.networkHandler.connect("ws://localhost:456");
         this.renderer.setup(); //Begin loading the actual game.
 
         // TEMP: for testing

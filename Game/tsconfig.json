@@ -5,7 +5,8 @@
     "target":"es2020",
     "types": [
 		  "node"
-    ]
+    ],
+    "module": "commonjs"
   },
   "exclude": [
     "node_modules"

@@ -1,1 +1,1 @@
-tsc --outDir "./dist/"
+tsc --outDir "./dist/" --target es6

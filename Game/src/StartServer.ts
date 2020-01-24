@@ -9,3 +9,5 @@ function StartServer():void{
   const server: Server = new Server();
   console.log("Created server");
 }
+
+StartServer();

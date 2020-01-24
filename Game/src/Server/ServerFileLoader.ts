@@ -10,7 +10,8 @@ export class ServerFileLoader implements FileLoader {
   public loadConfig():Promise<object>{
     return new Promise((resolve:(obj:object)=>void,reject:(errCode:number)=>void)=>{
       try {
-        const cfgObject:object = JSON.parse(fs.readFileSync(__dirname + "/../config.json").toString());
+        console.log(__dirname + "/./config.json");
+        const cfgObject:object = JSON.parse(fs.readFileSync("./config.json").toString());
         resolve(cfgObject);
       } catch(e){
         console.error("An error occured reading the config.json file on the server.")
