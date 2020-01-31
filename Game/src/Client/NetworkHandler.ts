@@ -23,7 +23,6 @@ export class NetworkHandler {
 
       this.ws.onmessage = (ev:MessageEvent):any=>{
         let data:any = ev.data;
-        console.log("Data recieved:",ev.data);
         if (data instanceof Blob){
           let fr:FileReader = new FileReader(); //Create reader for data.
           fr.readAsArrayBuffer(data);

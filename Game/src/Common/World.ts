@@ -67,7 +67,6 @@ export class World{
 
   /**Add a recieved rigidObject to the world.*/
   public addRigidObject(ro:RigidObject):boolean{
-  console.log("Adding new RigidObject to world.",ro);
     if (this.entities.includes(ro)){ //Check if entity already exists.
       return false;
     } else {

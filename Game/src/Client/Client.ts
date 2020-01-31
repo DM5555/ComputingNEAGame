@@ -27,7 +27,7 @@ export class Client extends InvokingInstance{
       this.userInputHandler.setup(<ClientFileLoader>this.fileLoader).then(()=>{ //Setup the user input handler.
       return this.renderer.loadAssets(<ClientFileLoader>this.fileLoader);
     }).then(()=>{ //Another callback (chained promises)).
-        this.networkHandler.connect("ws://"+window.location.host+":456");
+        this.networkHandler.connect("wss://"+window.location.host+":456");
         this.renderer.setup(); //Begin loading the actual game.
         this.networkHandler.eventRegistry.addEventListener("addRigidObject",(ro:RigidObject)=>{
           this.gameState.world.addRigidObject(ro);

@@ -93,13 +93,21 @@ export class Server extends InvokingInstance{
 
   /**Create a server with the specified port number. 0-65535 */
   private createServer(port:number):void{
-    this.WSServer = new WebSocket.Server({
-      server: (http.createServer({
-        /*cert: fs.readFileSync("../Login Server/.secret/cert.crt"),
-        key: fs.readFileSync("../Login Server/.secret/key.key")*/
-      })),
-      port: port
+
+
+    let cert:Buffer = fs.readFileSync("../Login Server/.secret/cert.crt");
+    let key:Buffer = fs.readFileSync("../Login Server/.secret/key.key");
+
+    let HTTPSServer:https.Server = https.createServer({
+      cert:cert,
+      key:key
     });
+    this.WSServer = new WebSocket.Server({
+      server: HTTPSServer
+    });
+
+    HTTPSServer.listen(456);
+
 
     this.WSServer.on("connection",(conn:WebSocket)=>{
       console.log("Connection established!");
@@ -123,7 +131,6 @@ export class Server extends InvokingInstance{
       });
 
       conn.on("message",(data:string)=>{ //Message recieved.
-        console.log("Message recieved: " + data);
       });
 
       setInterval(()=>{
