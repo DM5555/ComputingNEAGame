@@ -12,6 +12,7 @@ export class NetworkTranscoder{
   /**Create a network transcoder. The buffer class must be passed to this.*/
   constructor(){
     this.IDEntityMappings = new Map();
+    this.nextID = 0;
   }
 
   /**Encode the (new) RigidObject into data.*/

@@ -65,6 +65,18 @@ export class World{
     return rigidObject; //Return object.
   }
 
+  /**Add a recieved rigidObject to the world.*/
+  public addRigidObject(ro:RigidObject):boolean{
+  console.log("Adding new RigidObject to world.",ro);
+    if (this.entities.includes(ro)){ //Check if entity already exists.
+      return false;
+    } else {
+      this.entities.push(ro); //Add entity to world.
+      this.eventRegistry.dispatchEvent("addEntity",ro); //Dispatch the event to the renderer.
+      return true;
+    }
+  }
+
   /**Removes the given entity from the world.*/
   public removeEntity(e:Entity):void{
     this.eventRegistry.dispatchEvent("deleteEntity",e); //Calls delete event.

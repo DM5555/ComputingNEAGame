@@ -9,6 +9,7 @@ import {Vector2} from "../Common/Vector2"; // TEMP: for testing
 import {ClientFileLoader} from "./ClientFileLoader";
 import {UserInputHandler} from "./UserInputHandler";
 import {NetworkHandler} from "./NetworkHandler";
+import {RigidObject} from "../Common/RigidObject";
 
 export class Client extends InvokingInstance{
   private renderer:Renderer;
@@ -26,48 +27,11 @@ export class Client extends InvokingInstance{
       this.userInputHandler.setup(<ClientFileLoader>this.fileLoader).then(()=>{ //Setup the user input handler.
       return this.renderer.loadAssets(<ClientFileLoader>this.fileLoader);
     }).then(()=>{ //Another callback (chained promises)).
-        this.networkHandler.connect("ws://localhost:456");
+        this.networkHandler.connect("ws://"+window.location.host+":456");
         this.renderer.setup(); //Begin loading the actual game.
-
-        // TEMP: for testing
-        this.gameState.world.addRectangle(
-          new Vector2(1,1), //4m by 4m.
-          new Vector2(0,0), //30 along, 16 down.
-          new Vector2(0,0), //Stationary.
-          "Bricks"
-        );
-
-        this.gameState.world.addRectangle(
-          new Vector2(1,1), //4m by 4m.
-          new Vector2(63,35), //30 along, 16 down.
-          new Vector2(0,0), //Stationary.
-          "Bricks"
-        );
-        this.gameState.world.addRectangle(
-          new Vector2(66,1),
-          new Vector2(-1,-1),
-          new Vector2(0,0),
-          "Stripes"
-        );
-        this.gameState.world.addRectangle(
-          new Vector2(66,1),
-          new Vector2(-1,36),
-          new Vector2(0,0),
-          "Stripes"
-        );
-        this.gameState.world.addRectangle(
-          new Vector2(1,36),
-          new Vector2(-1,0),
-          new Vector2(0,0),
-          "Stripes"
-        );
-        this.gameState.world.addRectangle(
-          new Vector2(1,36),
-          new Vector2(64,0),
-          new Vector2(0,0),
-          "Stripes"
-        );
-
+        this.networkHandler.eventRegistry.addEventListener("addRigidObject",(ro:RigidObject)=>{
+          this.gameState.world.addRigidObject(ro);
+        });
 
         setInterval(()=>{ //TESTING (Also RIP VSync.)
           let newCameraPosition:Vector2 = this.renderer.getCameraPosition();

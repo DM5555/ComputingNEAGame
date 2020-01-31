@@ -1,11 +1,15 @@
 import {NetworkTranscoder} from "../Common/NetworkTranscoder";
+import {DGEventListenerRegistry} from "../Common/DGEventListenerRegistry";
 
 /**Does stuff relating to the communications such as handle connections and encode/decode data on the client side. */
 export class NetworkHandler {
   private ws:WebSocket;
   private transcoder:NetworkTranscoder;
+  public eventRegistry:DGEventListenerRegistry; //Event registry.
+
   constructor(){
     this.transcoder = new NetworkTranscoder();
+    this.eventRegistry = new DGEventListenerRegistry();
   }
 
   /**Connect to the specified server. */
@@ -24,7 +28,7 @@ export class NetworkHandler {
           let fr:FileReader = new FileReader(); //Create reader for data.
           fr.readAsArrayBuffer(data);
           fr.addEventListener("loadend",()=>{ //Asynchronously read.
-            console.log("RigidObject:",this.transcoder.decodeRigidObject(fr.result));
+            this.eventRegistry.dispatchEvent("addRigidObject",this.transcoder.decodeRigidObject(fr.result))
           });
         }
       }

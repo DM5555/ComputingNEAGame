@@ -5,5 +5,6 @@
   "BackgroundClose":"background2.svg",
   "DefaultTexture":"missing_texture.svg",
   "Bricks":"bricks.svg",
-  "Stripes":"stripes.svg"
+  "Stripes":"stripes.svg",
+  "Diamond":"diamond.png"
 }
