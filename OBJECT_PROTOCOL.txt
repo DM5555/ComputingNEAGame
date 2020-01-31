@@ -1,10 +1,10 @@
 USE Big Endianness.
 USE ASCII.
 
-For RigidObjects:
+For new RigidObjects:
 
-AAAA B C DDDD DDDD EEEE EEEE FF (GGGG GGGG)*F HH (IIII IIII)*H
-
+X AAAA B C DDDD DDDD EEEE EEEE FF (GGGG GGGG)*F HH (IIII IIII)*H
+X = Action Type (Create rigid object = 0x01)
 A = Object ID (32 bits)
 B = Texture name length (8 bit u int)
 C = Texture name (Specified by B)
