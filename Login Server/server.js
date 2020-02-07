@@ -770,7 +770,7 @@ const server = https.createServer({
               outputStream = zlib.createGzip(); //Create a gzip compressor.
               outputStream.pipe(res); //Pipe the compressed data into the response.
 
-              outputStream.on('error',() => { //Error handling.
+              outputStream.on('error',(err) => { //Error handling.
                 error500(res);
               });
             } else {
@@ -780,7 +780,11 @@ const server = https.createServer({
             readStream.pipe(outputStream); //Pipe the read stream into the output stream.
 
             readStream.on('error', (err)=>{ //File not found.
-              error500(res); //Internal server error.
+              if (err.code === "EISDIR"){ //File is a folder.
+                error404(res);
+              } else { //Error occurred.
+                error500(res); //Internal server error.
+              }
             });
           } else { //File not found.
             error404(res);
