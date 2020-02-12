@@ -6,31 +6,35 @@ import {InvokingInstance} from "../Common/InvokingInstance";
 import {Context} from "../Common/Context";
 import {NetworkTranscoder} from "../Common/NetworkTranscoder";
 import {Vector2} from "../Common/Vector2";
+import {WorldLoader} from "./WorldLoader";
 import {RigidObject} from "../Common/RigidObject";
 import {Entity} from "../Common/Entity";
 
 import WebSocket = require("ws");
 import fs = require("fs");
 import https = require("https");
-import http = require("http");
 
 export class Server extends InvokingInstance{
   WSServer:WebSocket.Server;
+  private worldLoader:WorldLoader;
 
   constructor(){
     super(Context.SERVER,()=>{
+      this.worldLoader = new WorldLoader("world",this.fileLoader); //Create new file loader instance
+      this.worldLoader.addObjects(this.gameState.world);
+      /*
       // TEMP: for testing
       this.gameState.world.addRectangle(
-        new Vector2(1,1), //4m by 4m.
-        new Vector2(0,0), //30 along, 16 down.
-        new Vector2(0,0), //Stationary.
-        "Bricks"
+        new Vector2(1,1), //Width and height
+        new Vector2(0,0), //Position
+        new Vector2(0,0), //Velocity
+        "Bricks" //Texture name
       );
 
       this.gameState.world.addRectangle(
-        new Vector2(1,1), //4m by 4m.
-        new Vector2(63,35), //30 along, 16 down.
-        new Vector2(0,0), //Stationary.
+        new Vector2(1,1),
+        new Vector2(63,35),
+        new Vector2(0,0),
         "Bricks"
       );
       this.gameState.world.addRectangle(
@@ -86,6 +90,7 @@ export class Server extends InvokingInstance{
         }
 
       },1000/60);
+      */
     }); //Invoke superclass. Callback is for test purposes.
     console.log("Made new server object! Now creating WS server.");
     this.createServer(456);

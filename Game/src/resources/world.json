@@ -1,0 +1,47 @@
+{
+  "rectangles":[
+    {
+      "dim": [1,1],
+      "pos": [0,0],
+      "vel": [0,0],
+      "tex": "Bricks"
+    },
+    {
+      "dim": [1,1],
+      "pos": [63,35],
+      "vel": [0,0],
+      "tex": "Bricks"
+    },
+    {
+      "dim": [66,1],
+      "pos": [-1,-1],
+      "vel": [0,0],
+      "tex": "Stripes"
+    },
+    {
+      "dim": [66,1],
+      "pos": [-1,36],
+      "vel": [0,0],
+      "tex": "Stripes"
+    },
+    {
+      "dim": [1,36],
+      "pos": [-1,0],
+      "vel": [0,0],
+      "tex": "Stripes"
+    },
+    {
+      "dim": [1,36],
+      "pos": [64,0],
+      "vel": [0,0],
+      "tex": "Stripes"
+    },
+    {
+      "dim": [10,10],
+      "pos": [16,16],
+      "vel": [5,5],
+      "tex": "Diamond"
+    }
+
+  ]
+}

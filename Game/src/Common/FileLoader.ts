@@ -5,4 +5,5 @@ This will be for I/O operations.
 
 export interface FileLoader {
   loadConfig():Promise<object>
+  loadJSONFile(name:string):Promise<object>
 }
