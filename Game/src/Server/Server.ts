@@ -6,6 +6,7 @@ import {InvokingInstance} from "../Common/InvokingInstance";
 import {Context} from "../Common/Context";
 import {NetworkTranscoder} from "../Common/NetworkTranscoder";
 import {Vector2} from "../Common/Vector2";
+import {Player} from "../Common/Player";
 import {WorldLoader} from "./WorldLoader";
 import {RigidObject} from "../Common/RigidObject";
 import {Entity} from "../Common/Entity";
@@ -17,6 +18,7 @@ import https = require("https");
 export class Server extends InvokingInstance{
   WSServer:WebSocket.Server;
   private worldLoader:WorldLoader;
+  private transcoder:NetworkTranscoder;
 
   constructor(){
     super(Context.SERVER,()=>{
@@ -98,8 +100,6 @@ export class Server extends InvokingInstance{
 
   /**Create a server with the specified port number. 0-65535 */
   private createServer(port:number):void{
-
-
     let cert:Buffer = fs.readFileSync("../Login Server/.secret/cert.crt");
     let key:Buffer = fs.readFileSync("../Login Server/.secret/key.key");
 
@@ -113,6 +113,7 @@ export class Server extends InvokingInstance{
 
     HTTPSServer.listen(456);
 
+    this.transcoder = new NetworkTranscoder();
 
     this.WSServer.on("connection",(conn:WebSocket)=>{
       console.log("Connection established!");
@@ -120,12 +121,10 @@ export class Server extends InvokingInstance{
 
       let sendEntity:(ent:Entity)=>void = (ent:Entity)=>{
         if (ent instanceof RigidObject){ //The entity is a rigidObject.
-          let encoded:Buffer = testTranscoder.encodeRigidObject(ent);
+          let encoded:Buffer = this.transcoder.encodeRigidObject(ent);
           conn.send(encoded);
         }
       }
-
-      let testTranscoder:NetworkTranscoder = new NetworkTranscoder();
 
       for (let e of this.gameState.world.getEntities()){
         sendEntity(e);
@@ -136,6 +135,8 @@ export class Server extends InvokingInstance{
       });
 
       conn.on("message",(data:string)=>{ //Message recieved.
+        let player:Player = <Player> this.transcoder.decodeRigidObject(data);
+        this.gameState.world.addRigidObject(player);
       });
 
       setInterval(()=>{

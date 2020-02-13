@@ -2,11 +2,13 @@ import {RigidObject} from "../Common//RigidObject";
 import {Vector2} from "../Common/Vector2";
 import {BoundingBox} from "../Common/BoundingBox";
 import {Entity} from "../Common/Entity";
+import {Player} from "../Common/Player";
 
 /**Converts objects and information into data that can be send across the internet.*/
 export class NetworkTranscoder{
   private nextID:number; //ID to use for the next object.
   private IDEntityMappings:Map<number,Entity>;
+  public selfPlayer:Player; //Player to not be updated by the transcoder.
 
 
   /**Create a network transcoder. The buffer class must be passed to this.*/
@@ -28,10 +30,16 @@ export class NetworkTranscoder{
     });
 
     if (!entityFound){ //Entity not registered
-      id = this.nextID; //Create a new ID.
-      this.nextID++;
-      this.IDEntityMappings.set(id,ro);
+      if (ro instanceof Player){
+        id = Date.now()%100000000; //Use current timestamp as ID (to 8 digits).
+      } else {
+        id = this.nextID; //Create a new ID.
+        this.nextID++;
+      }
+
+      this.IDEntityMappings.set(id,ro); //Set ID in mappings.
     }
+
 
     let textureLength:number = ro.getTextureName().length;
     let textureName:string = ro.getTextureName();
@@ -101,7 +109,7 @@ export class NetworkTranscoder{
 
     let id:number = buf.readInt32BE(offset); //Read ID.
     offset+=4;
-
+    
     let textureLength:number = buf.readUInt8(offset);  //Read texture length.
     offset+=1;
 
@@ -152,6 +160,7 @@ export class NetworkTranscoder{
     if(this.IDEntityMappings.has(id)){ //Entity already registered
       let exisitingEntity:RigidObject = <RigidObject>this.IDEntityMappings.get(id);
 
+      if (exisitingEntity !== this.selfPlayer){ //Only if the existing entity is not the self player (client only.)
       //Update the positions of the entity to the values recieved over the network.
       exisitingEntity.position.a = positionX;
       exisitingEntity.position.b = positionY;
@@ -161,6 +170,8 @@ export class NetworkTranscoder{
       exisitingEntity.velocity.b = velocityY;
 
       return exisitingEntity; //Return this entity.
+      }
+
     } else { //Entity was not registered and needs to be created so that it can be passed to the renderer class.
       let ro:RigidObject = new RigidObject(hitbox,drawmodel,position,velocity,textureName); //Create new RigidObject.
       this.IDEntityMappings.set(id,ro); //Return the new object that was just created.

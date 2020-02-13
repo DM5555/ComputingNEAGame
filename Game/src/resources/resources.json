@@ -6,5 +6,6 @@
   "DefaultTexture":"missing_texture.svg",
   "Bricks":"bricks.svg",
   "Stripes":"stripes.svg",
-  "Diamond":"diamond.png"
+  "Diamond":"diamond.png",
+  "Player":"player1.png"
 }
